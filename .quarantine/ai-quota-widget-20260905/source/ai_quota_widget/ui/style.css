@@ -1,0 +1,200 @@
+/* Modern Dark Glass Floating Window */
+window.floating-window {
+    background-color: #11141c;
+    border: 1px solid #283042;
+    border-radius: 12px;
+}
+
+.main-container {
+    padding: 10px 12px 12px 12px;
+}
+
+/* Header */
+.header-bar {
+    padding: 2px 4px 6px 4px;
+    border-bottom: 1px solid #1e2433;
+    margin-bottom: 8px;
+}
+
+.app-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+.header-btn {
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 2px 5px;
+    color: #94a3b8;
+    font-size: 12px;
+    min-height: 22px;
+    min-width: 22px;
+}
+
+.header-btn:hover {
+    background-color: #262c3b;
+    color: #f8fafc;
+}
+
+.header-btn-close:hover {
+    background-color: #dc2626;
+    color: #ffffff;
+}
+
+/* Service Card */
+.service-card {
+    background-color: #171b26;
+    border: 1px solid #232a3b;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+}
+
+.service-card:hover {
+    border-color: #38435d;
+}
+
+.card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #f8fafc;
+}
+
+.tier-badge {
+    background-color: #1e2638;
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 10px;
+    padding: 0 6px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.tier-badge-codex {
+    color: #34d399;
+    border-color: rgba(52, 211, 153, 0.3);
+}
+
+.tier-badge-agy {
+    color: #818cf8;
+    border-color: rgba(129, 140, 248, 0.3);
+}
+
+.tier-badge-grok {
+    color: #fb923c;
+    border-color: rgba(251, 146, 60, 0.3);
+}
+
+.metric-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+}
+
+.metric-value {
+    font-size: 11px;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.secondary-metric {
+    font-size: 10px;
+    color: #64748b;
+    margin-top: 1px;
+}
+
+.status-label {
+    font-size: 11px;
+    color: #64748b;
+}
+
+/* Progress Bars */
+progressbar trough {
+    background-color: #0b0e14;
+    border-radius: 3px;
+    min-height: 5px;
+}
+
+/* Short-term bar (Cyan / Blue) */
+progressbar.progress-short progress {
+    background-color: #06b6d4;
+    border-radius: 3px;
+    min-height: 5px;
+}
+
+/* Long-term bar (Purple / Indigo) */
+progressbar.progress-long progress {
+    background-color: #8b5cf6;
+    border-radius: 3px;
+    min-height: 5px;
+}
+
+progressbar.progress-warning progress {
+    background-color: #f59e0b;
+}
+
+progressbar.progress-danger progress {
+    background-color: #ef4444;
+}
+
+/* Card Action Buttons */
+.action-btn {
+    background-color: #202636;
+    border: 1px solid #313b52;
+    border-radius: 5px;
+    color: #e2e8f0;
+    font-size: 11px;
+    padding: 2px 7px;
+    min-height: 22px;
+}
+
+.action-btn:hover {
+    background-color: #2d364d;
+    color: #ffffff;
+    border-color: #475569;
+}
+
+.action-btn-primary {
+    background-color: #1d3557;
+    border-color: #2a5298;
+    color: #93c5fd;
+}
+
+.action-btn-primary:hover {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+/* Mini Edge Pill Window (Zero black space, ultra-compact) */
+window.mini-pill-window {
+    background-color: #11141c;
+    border: 1px solid #38bdf8;
+    border-radius: 14px;
+}
+
+.mini-container {
+    padding: 2px 8px;
+    min-height: 24px;
+}
+
+.mini-text {
+    font-size: 11px;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+.mini-btn-expand {
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #38bdf8;
+    padding: 0 4px;
+    font-size: 10px;
+}
+
+.mini-btn-expand:hover {
+    background-color: #1e293b;
+    color: #ffffff;
+}

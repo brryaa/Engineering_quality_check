@@ -1,0 +1,37 @@
+{
+  "app": {
+    "refresh_interval": 300,
+    "always_on_top": true,
+    "mini_mode": false,
+    "opacity": 0.96,
+    "window_x": 983,
+    "window_y": 84,
+    "theme": "dark"
+  },
+  "services": {
+    "codex": {
+      "name": "Codex (ChatGPT)",
+      "auth_mode": "app",
+      "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6Im1GbmJENFYtS0kwRVhEeWM0UV92ZGFuVGhFd0c0OHZhSXN1ektTSnRuOXMiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOlsiaHR0cHM6Ly9hcGkub3BlbmFpLmNvbS92MSJdLCJjbGllbnRfaWQiOiJhcHBfRU1vYW1FRVo3M2YwQ2tYYVhwN2hyYW5uIiwiaHR0cHM6Ly9hcGkub3BlbmFpLmNvbS9hdXRoIjp7ImFtciI6WyJwd2QiLCJ1cm46b3BlbmFpOmFtcjpwYXNzd29yZCIsIm90cCIsIm1mYSIsInVybjpvcGVuYWk6YW1yOm90cF90b3RwIl0sImNoYXRncHRfYWNjb3VudF9pZCI6Ijk3NzA2MTI1LWRhYWEtNDE4ZS05YzJmLTAyYzlhYjVlOTUxYSIsImNoYXRncHRfYWNjb3VudF91c2VyX2lkIjoidXNlci1md0lDNzF3T3JQSjJ6YjlZU0JjR2lHd1lfXzk3NzA2MTI1LWRhYWEtNDE4ZS05YzJmLTAyYzlhYjVlOTUxYSIsImNoYXRncHRfY29tcHV0ZV9yZXNpZGVuY3kiOiJub19jb25zdHJhaW50IiwiY2hhdGdwdF9wbGFuX3R5cGUiOiJwbHVzIiwiY2hhdGdwdF91c2VyX2lkIjoidXNlci1md0lDNzF3T3JQSjJ6YjlZU0JjR2lHd1kiLCJsb2NhbGhvc3QiOnRydWUsInBvaWQiOiJvcmctUkhrbng4N1JQUEdxemNQVGFTc1pPZ0VFIiwidXNlcl9pZCI6InVzZXItZndJQzcxd09yUEoyemI5WVNCY0dpR3dZIn0sImh0dHBzOi8vYXBpLm9wZW5haS5jb20vcHJvZmlsZSI6eyJlbWFpbCI6IjE3MjYzODQ1MTFAcXEuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJDcmlzIFRvbm55cmlzIn0sImlzcyI6Imh0dHBzOi8vYXV0aC5vcGVuYWkuY29tIiwicHdkX2F1dGhfdGltZSI6MTc4NDQzNDQyMjAzMiwic2NwIjpbIm9wZW5pZCIsInByb2ZpbGUiLCJlbWFpbCIsIm9mZmxpbmVfYWNjZXNzIiwiYXBpLmNvbm5lY3RvcnMucmVhZCIsImFwaS5jb25uZWN0b3JzLmludm9rZSJdLCJzZXNzaW9uX2lkIjoiYXV0aHNlc3NfOXU5cjFXMVJIYkFPWFlwSzRuSmExc0ZTIiwic2wiOnRydWUsInN1YiI6ImF1dGgwfDYzOTMzY2FjMTM1ZTljYmM1ZjM4Y2Q3MiIsImlhdCI6MTc4ODM0MDU1MCwiZXhwIjoxNzg5MjA0NTUwLCJqdGkiOiJiNzhiMmM2OWE5NDQ0NDJlOGFmMjY4NzkwM2I3OGFhYiIsIm5iZiI6MTc4ODM0MDU1MH0.a1qMRdWBIXcsZaI_axXV8wxB9iPOHGOgzule4XgbwfxyLBfhjS0FttpayUETb9rCsTNHRRtlBaWwHUlzNtHSXD05qn7W4ul65pSQAwuKN7zKbKfn_3tXRjw3AVJvKdds1yVr9ZGJFCbHFHqsAA2WdytF2hm2R5iDrVVdbPs6iXe-lif5tEC0Fi2kd2E6VO4QaIVq6wuVjfzrqK_L-5BMCD_ekydMVuzlWfF_a9bAeLfp_9pKg4ZE4efxX2V2j9gQ8DPWWP8R_ZizSzA3kpK07I5Tm4OCql67LOzZGH4x9OaQwAlZeGLXV8F-Zk_woCX9p-XFHqvKKh-uNpUgB-gChQ",
+      "session_token": "",
+      "account_id": "97706125-daaa-418e-9c2f-02c9ab5e951a",
+      "cookie": "test_token_123",
+      "last_quota": {}
+    },
+    "agy": {
+      "name": "AGY (Antigravity)",
+      "auth_mode": "local",
+      "api_key": "",
+      "oauth_token": "",
+      "model": "Gemini 3.8 Flash (High)",
+      "last_quota": {}
+    },
+    "grok": {
+      "name": "Grok Build",
+      "auth_mode": "browser",
+      "sso_cookie": "sso=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzZXNzaW9uX2lkIjoiNjRjNTdiZGMtNjcwOC00MWJlLWI4YWMtMzY5YTgwMmI4ZTk0In0.ovy5iVk5O4-OAMuj55sYCKcz6dbmBS2JD4CVyB4E1oU",
+      "model_name": "grok-3",
+      "last_quota": {}
+    }
+  }
+}

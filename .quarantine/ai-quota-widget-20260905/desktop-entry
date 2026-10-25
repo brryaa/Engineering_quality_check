@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=AI Quota Widget (算力余量浮窗)
+Comment=显示 Codex, AGY, Grok Build 的余量监控浮窗
+Exec=/home/brrr/.local/bin/ai-quota-widget
+Icon=utilities-system-monitor
+Terminal=false
+Categories=Utility;Development;
+StartupNotify=true
