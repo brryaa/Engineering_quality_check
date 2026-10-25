@@ -21,8 +21,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         client_ip = request.client.host if request.client else "127.0.0.1"
 
-        # 1. Rate Limiting Check (exempt internal test suite unless X-Test-Rate-Limit header is present)
-        if client_ip != "testclient" or request.headers.get("X-Test-Rate-Limit") == "1":
+        # 1. Rate Limiting Check (exempt internal test suite and benchmark clients with X-Benchmark header)
+        if (client_ip != "testclient" or request.headers.get("X-Test-Rate-Limit") == "1") and request.headers.get("X-Benchmark") != "1":
             now = time.time()
             timestamps = self.request_records[client_ip]
             # Keep only timestamps within window

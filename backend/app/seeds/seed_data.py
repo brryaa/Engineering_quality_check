@@ -477,8 +477,10 @@ def seed_database():
                 if stat in ["Approved", "Implemented"]:
                     approver = random.choice(ENGINEERS)
                     app_dt = (datetime.now() - timedelta(days=random.randint(5, 40))).strftime("%Y-%m-%d")
+                post_rev = f"Rev {chr(ord(part.revision[4]) + 1)}.0" if len(part.revision) >= 5 else "Rev B.0"
                 if stat == "Implemented":
                     imp_dt = (datetime.now() - timedelta(days=random.randint(1, 10))).strftime("%Y-%m-%d")
+                    part.revision = post_rev
 
                 ecr = EngineeringChange(
                     change_code=f"ECR-2026-{change_idx:04d}",
@@ -490,7 +492,7 @@ def seed_database():
                     reason=f"Corrective engineering modification prompted by issue {iss.issue_code}. "
                            f"Redesign seal cross-section / structural ribs to withstand slam fatigue.",
                     pre_change_rev=part.revision,
-                    post_change_rev=f"Rev {chr(ord(part.revision[4]) + 1)}.0" if len(part.revision) >= 5 else "Rev B.0",
+                    post_change_rev=post_rev,
                     cost_impact_rmb=cost,
                     weight_impact_kg=weight,
                     tooling_lead_weeks=random.randint(2, 12),

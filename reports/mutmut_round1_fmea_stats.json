@@ -1,0 +1,16 @@
+{
+    "target_module": "app/services/fmea_engine.py",
+    "round": 1,
+    "total": 199,
+    "initial_killed": 172,
+    "initial_survived": 27,
+    "initial_mutation_score": "86.43%",
+    "post_hardening_killed": 199,
+    "post_hardening_survived": 0,
+    "final_mutation_score": "100.00%",
+    "no_tests": 0,
+    "skipped": 0,
+    "suspicious": 0,
+    "timeout": 0,
+    "segfault": 0
+}

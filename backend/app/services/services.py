@@ -16,6 +16,7 @@ from app.schemas.schemas import (
     KnowledgeItemCreate, KnowledgeItemUpdate, QualityDashboardStats
 )
 from app.services.fmea_engine import calculate_rpn, calculate_action_priority
+from app.services.lifecycle_engine import LifecycleEngine
 from app.repositories.repositories import (
     ProgramRepository, PartRepository, DFMEARepository,
     DVPRRepository, TestRunRepository, IssueRepository,
@@ -195,13 +196,7 @@ class TestRunService:
         dvpr = self.dvpr_repo.get_by_id(data.dvpr_id)
         if not dvpr:
             raise BusinessRuleViolationError(f"DVPR with id {data.dvpr_id} does not exist.")
-        if dvpr.status == "Blocked":
-            raise BusinessRuleViolationError("Cannot execute test runs against a Blocked DVP&R plan.")
-        if data.measurement_data:
-            try:
-                json.loads(data.measurement_data)
-            except Exception:
-                raise BusinessRuleViolationError("measurement_data must be valid JSON telemetry.")
+        LifecycleEngine.validate_dvpr_test_execution(dvpr.status, data.measurement_data)
         if self.repo.get_by_run_number(data.run_number):
             raise DuplicateEntityError(f"TestRun with number '{data.run_number}' already exists.")
 
@@ -209,12 +204,7 @@ class TestRunService:
         self.db.add(tr)
 
         # Synchronize DVP status
-        if dvpr.status == "Planned":
-            dvpr.status = "In Progress"
-        if data.result == "Fail" and dvpr.status != "Failed":
-            dvpr.status = "Failed"
-        elif data.result == "Pass" and dvpr.status == "In Progress":
-            dvpr.status = "Passed"
+        dvpr.status = LifecycleEngine.compute_dvpr_status_transition(dvpr.status, data.result)
 
         self.db.commit()
         self.db.refresh(tr)
@@ -301,16 +291,14 @@ class RootCauseService:
         issue = self.issue_repo.get_by_id(data.issue_id)
         if not issue:
             raise BusinessRuleViolationError(f"Issue with id {data.issue_id} does not exist.")
-        if issue.status == "Closed":
-            raise BusinessRuleViolationError("Cannot perform 5-Why root cause analysis on an already Closed issue. Issue must be reopened first.")
+        LifecycleEngine.validate_root_cause_creation(issue.status)
         if self.repo.get_by_issue_id(data.issue_id):
             raise DuplicateEntityError(f"Root Cause Analysis already exists for Issue {issue.issue_code}.")
 
         rc = RootCauseAnalysis(**data.model_dump())
         self.db.add(rc)
 
-        if data.verification_result == "Confirmed" and issue.status in ["New", "Investigating", "Containment"]:
-            issue.status = "RootCauseVerified"
+        issue.status = LifecycleEngine.compute_issue_status_on_root_cause(data.verification_result, issue.status)
 
         self.db.commit()
         self.db.refresh(rc)
@@ -321,15 +309,15 @@ class RootCauseService:
         for k, v in data.model_dump(exclude_unset=True).items():
             setattr(rc, k, v)
 
-        if rc.verification_result == "Confirmed" and rc.issue.status in ["New", "Investigating", "Containment"]:
-            rc.issue.status = "RootCauseVerified"
+        if rc.issue:
+            rc.issue.status = LifecycleEngine.compute_issue_status_on_root_cause(rc.verification_result, rc.issue.status)
 
         return self.repo.update(rc)
 
     def delete_root_cause(self, rc_id: int) -> None:
         rc = self.get_root_cause(rc_id)
-        if rc.issue and rc.issue.status == "RootCauseVerified":
-            rc.issue.status = "Investigating"
+        if rc.issue:
+            rc.issue.status = LifecycleEngine.compute_issue_status_on_root_cause_deletion(rc.issue.status)
         self.repo.delete(rc)
 
 
@@ -357,10 +345,7 @@ class ChangeService:
             raise BusinessRuleViolationError(f"Part with id {data.part_id} does not exist.")
         if data.issue_id and not self.issue_repo.get_by_id(data.issue_id):
             raise BusinessRuleViolationError(f"Issue with id {data.issue_id} does not exist.")
-        if data.pre_change_rev and data.post_change_rev and data.post_change_rev == data.pre_change_rev:
-            raise BusinessRuleViolationError("post_change_rev must differ from pre_change_rev.")
-        if data.approval_status == "Implemented":
-            raise BusinessRuleViolationError("Cannot implement an unapproved engineering change. Must be Approved first.")
+        LifecycleEngine.validate_change_creation(data.pre_change_rev, data.post_change_rev, data.approval_status)
         if self.repo.get_by_change_code(data.change_code):
             raise DuplicateEntityError(f"Change with code '{data.change_code}' already exists.")
 
@@ -372,13 +357,9 @@ class ChangeService:
         up_data = data.model_dump(exclude_unset=True)
 
         new_status = up_data.get("approval_status")
-        if new_status == "Implemented" and ecr.approval_status != "Approved":
-            raise BusinessRuleViolationError("Cannot implement an unapproved engineering change. Must be Approved first.")
-
         pre_rev = up_data.get("pre_change_rev", ecr.pre_change_rev)
         post_rev = up_data.get("post_change_rev", ecr.post_change_rev)
-        if pre_rev and post_rev and pre_rev == post_rev:
-            raise BusinessRuleViolationError("post_change_rev must differ from pre_change_rev.")
+        LifecycleEngine.validate_change_transition(ecr.approval_status, new_status, pre_rev, post_rev)
 
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 

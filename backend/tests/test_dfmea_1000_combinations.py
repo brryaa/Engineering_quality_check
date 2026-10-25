@@ -79,18 +79,85 @@ def test_dfmea_boundary_and_illegal_inputs():
     # S=7, O=2, D=7 -> Medium (fixed in WP4)
     assert calculate_action_priority(7, 2, 7) == "Medium"
 
-    # Out of range inputs
-    with pytest.raises(ValueError):
-        calculate_action_priority(0, 5, 5)
-    with pytest.raises(ValueError):
-        calculate_action_priority(11, 5, 5)
-    with pytest.raises(ValueError):
-        calculate_action_priority(5, 0, 5)
-    with pytest.raises(ValueError):
-        calculate_action_priority(5, 5, 12)
-    with pytest.raises(ValueError):
-        calculate_rpn(-1, 5, 5)
+    # Out of range inputs for calculate_action_priority
+    for oob in [0, 11, -1, 100]:
+        with pytest.raises(ValueError, match="must be integers in range"):
+            calculate_action_priority(oob, 5, 5)
+        with pytest.raises(ValueError, match="must be integers in range"):
+            calculate_action_priority(5, oob, 5)
+        with pytest.raises(ValueError, match="must be integers in range"):
+            calculate_action_priority(5, 5, oob)
 
-    # Type errors
-    with pytest.raises(TypeError):
-        calculate_action_priority("10", 5, 5) # type: ignore
+    # Out of range inputs for calculate_rpn
+    for invalid_val in [0, 11, -5, 100]:
+        with pytest.raises(ValueError, match="must be between 1 and 10"):
+            calculate_rpn(invalid_val, 5, 5)
+        with pytest.raises(ValueError, match="must be between 1 and 10"):
+            calculate_rpn(5, invalid_val, 5)
+        with pytest.raises(ValueError, match="must be between 1 and 10"):
+            calculate_rpn(5, 5, invalid_val)
+
+    # Strict type errors for all parameters with exact exception message check (kills mutmut_5)
+    for bad in ["5", 5.5, None, [5], {"val": 5}]:
+        with pytest.raises(TypeError) as exc_info:
+            calculate_action_priority(bad, 5, 5)  # type: ignore
+        assert str(exc_info.value) == "Severity, Occurrence, and Detection must be integers."
+
+        with pytest.raises(TypeError) as exc_info:
+            calculate_action_priority(5, bad, 5)  # type: ignore
+        assert str(exc_info.value) == "Severity, Occurrence, and Detection must be integers."
+
+        with pytest.raises(TypeError) as exc_info:
+            calculate_action_priority(5, 5, bad)  # type: ignore
+        assert str(exc_info.value) == "Severity, Occurrence, and Detection must be integers."
+
+    # ================= MUTATION KILLERS: EXACT AP BOUNDARY CELLS =================
+    # Kills mutmut_60, mutmut_61 in S in (9,10); O in (2,3); D boundary >= 5
+    assert calculate_action_priority(9, 2, 5) == "Medium"
+    assert calculate_action_priority(10, 3, 5) == "Medium"
+    assert calculate_action_priority(9, 2, 4) == "Low"
+    assert calculate_action_priority(10, 3, 4) == "Low"
+
+    # Kills mutmut in S in 7,8; O in 6,7; D boundary >= 5
+    assert calculate_action_priority(7, 6, 5) == "High"
+    assert calculate_action_priority(8, 7, 5) == "High"
+    assert calculate_action_priority(7, 6, 4) == "Medium"
+    assert calculate_action_priority(8, 7, 4) == "Medium"
+
+    # Kills mutmut_100, mutmut_101 (S in 7,8; O in 4,5; D boundary >= 2)
+    assert calculate_action_priority(7, 4, 2) == "Medium"
+    assert calculate_action_priority(8, 5, 2) == "Medium"
+    assert calculate_action_priority(7, 4, 1) == "Low"
+    assert calculate_action_priority(8, 5, 1) == "Low"
+
+    # Kills mutmut_130, mutmut_131 (S in 4,5,6; O in 8,9,10; D boundary >= 7)
+    assert calculate_action_priority(4, 8, 7) == "High"
+    assert calculate_action_priority(5, 9, 7) == "High"
+    assert calculate_action_priority(6, 10, 7) == "High"
+    assert calculate_action_priority(4, 8, 6) == "Medium"
+    assert calculate_action_priority(5, 9, 6) == "Medium"
+    assert calculate_action_priority(6, 10, 6) == "Medium"
+
+    # Kills mutmut_141, mutmut_142 (S in 4,5,6; O in 6,7; D boundary >= 5)
+    assert calculate_action_priority(4, 6, 5) == "Medium"
+    assert calculate_action_priority(5, 7, 5) == "Medium"
+    assert calculate_action_priority(6, 6, 5) == "Medium"
+    assert calculate_action_priority(4, 6, 4) == "Low"
+    assert calculate_action_priority(5, 7, 4) == "Low"
+    assert calculate_action_priority(6, 6, 4) == "Low"
+
+    # Kills mutmut_150, mutmut_152, mutmut_153 (S in 4,5,6; O in 4,5; D boundary >= 7)
+    assert calculate_action_priority(4, 4, 7) == "Medium"
+    assert calculate_action_priority(5, 4, 7) == "Medium"
+    assert calculate_action_priority(6, 5, 7) == "Medium"
+    assert calculate_action_priority(4, 4, 6) == "Low"
+    assert calculate_action_priority(5, 4, 6) == "Low"
+    assert calculate_action_priority(6, 5, 6) == "Low"
+
+    # Kills mutmut_164, mutmut_171, mutmut_172 (S in 2,3; O in 8,9,10; D boundary >= 7)
+    assert calculate_action_priority(2, 8, 7) == "Medium"
+    assert calculate_action_priority(3, 8, 7) == "Medium"
+    assert calculate_action_priority(2, 9, 7) == "Medium"
+    assert calculate_action_priority(3, 10, 7) == "Medium"
+    assert calculate_action_priority(2, 8, 6) == "Low"
+    assert calculate_action_priority(3, 8, 6) == "Low"
