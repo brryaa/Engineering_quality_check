@@ -4,10 +4,12 @@
 
 set -e
 
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 echo "============================================================"
 echo "🚀 [CI STEP 1/7]: Running Python Ruff Linter..."
 echo "============================================================"
-cd /home/brrr/agy
+cd "$PROJECT_ROOT"
 ruff check --config backend/pyproject.toml backend/app
 echo "✅ Ruff checks passed!"
 
@@ -29,7 +31,7 @@ echo ""
 echo "============================================================"
 echo "📐 [CI STEP 4/7]: Running TypeScript Strict Compilation Check..."
 echo "============================================================"
-cd /home/brrr/agy/frontend
+cd "$PROJECT_ROOT/frontend"
 npx tsc --noEmit
 echo "✅ TypeScript strict check passed!"
 

@@ -21,7 +21,7 @@
 ### 2.2 一键部署步骤
 ```bash
 # 1. 克隆或进入代码仓库目录
-cd /home/brrr/agy
+cd /home/brrr/agy/Engineering_quality_check
 
 # 2. 构建并启动全部容器服务
 docker compose up --build -d
@@ -60,9 +60,9 @@ After=network.target
 [Service]
 Type=simple
 User=brrr
-WorkingDirectory=/home/brrr/agy/backend
-Environment="PYTHONPATH=/home/brrr/agy/backend"
-Environment="DATABASE_URL=sqlite:////home/brrr/agy/backend/eql_platform.db"
+WorkingDirectory=/home/brrr/agy/Engineering_quality_check/backend
+Environment="PYTHONPATH=/home/brrr/agy/Engineering_quality_check/backend"
+Environment="DATABASE_URL=sqlite:////home/brrr/agy/Engineering_quality_check/backend/eql_platform.db"
 ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8088 --workers 4
 Restart=always
 RestartSec=5
@@ -81,7 +81,7 @@ sudo systemctl status eql-backend
 
 ### 3.2 前端构建与 Nginx 反向代理配置
 ```bash
-cd /home/brrr/agy/frontend
+cd /home/brrr/agy/Engineering_quality_check/frontend
 npm run build
 ```
 产物将输出在 `frontend/dist` 目录。将该目录路径配置至系统主 Nginx 的 `root` 指向即可。
@@ -95,12 +95,12 @@ SQLite 在 WAL 模式下具有极高的稳定性和读写并发能力，但需�
 ### 4.1 在线安全热备 (Online Backup)
 ```bash
 # 使用 SQLite 官方在线备份接口（避免读写过程中直接拷贝损坏）
-sqlite3 /home/brrr/agy/backend/eql_platform.db ".backup '/home/brrr/agy/backend/eql_backup_$(date +%Y%m%d).db'"
+sqlite3 /home/brrr/agy/Engineering_quality_check/backend/eql_platform.db ".backup '/home/brrr/agy/Engineering_quality_check/backend/eql_backup_$(date +%Y%m%d).db'"
 ```
 
 ### 4.2 空间整理与 WAL 检查点 (VACUUM & Checkpoint)
 ```bash
 # 定期清理碎片并回写 WAL 日志
-sqlite3 /home/brrr/agy/backend/eql_platform.db "PRAGMA wal_checkpoint(TRUNCATE);"
-sqlite3 /home/brrr/agy/backend/eql_platform.db "VACUUM;"
+sqlite3 /home/brrr/agy/Engineering_quality_check/backend/eql_platform.db "PRAGMA wal_checkpoint(TRUNCATE);"
+sqlite3 /home/brrr/agy/Engineering_quality_check/backend/eql_platform.db "VACUUM;"
 ```
