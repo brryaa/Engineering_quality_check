@@ -58,13 +58,13 @@ def test_register_new_user(unauth_client, db_session):
         "email": "chen@eql-auto.internal",
         "password": "SecretPass2026!",
         "full_name": "Dr. Chen",
-        "role": "design_engineer",
+        "role": "design_eng",
         "department": "Door Structures"
     })
     assert res.status_code == 201
     data = res.json()
     assert data["username"] == "engineer_chen"
-    assert data["role"] == "design_engineer"
+    assert data["role"] == "design_eng"
 
     # Confirm user can log in with new credentials
     login_res = unauth_client.post("/api/v1/auth/login", json={
@@ -96,3 +96,60 @@ def test_admin_list_users_rbac(unauth_client, auth_headers):
     viewer_headers = auth_headers("auditor", "viewer")
     res_viewer = unauth_client.get("/api/v1/auth/users", headers=viewer_headers)
     assert res_viewer.status_code == 403
+
+
+def test_self_registration_with_admin_role_strictly_forbidden(unauth_client, db_session):
+    """
+    CRITICAL SECURITY CHECK:
+    Verify that unauthenticated self-registration cannot elevate privileges to 'admin'.
+    Must return 403 Forbidden.
+    """
+    res = unauth_client.post("/api/v1/auth/register", json={
+        "username": "rogue_attacker",
+        "email": "attacker@evil.com",
+        "password": "HackerPassword123!",
+        "full_name": "Rogue Attacker",
+        "role": "admin"
+    })
+    assert res.status_code == 403
+    assert "Self-registration cannot grant administrative or quality lead roles" in res.json()["detail"]
+
+
+def test_self_registration_with_quality_lead_role_strictly_forbidden(unauth_client, db_session):
+    """Verify that unauthenticated self-registration cannot elevate privileges to 'quality_lead'."""
+    res = unauth_client.post("/api/v1/auth/register", json={
+        "username": "fake_lead",
+        "email": "fake_lead@test.com",
+        "password": "Password123!",
+        "full_name": "Fake Lead",
+        "role": "quality_lead"
+    })
+    assert res.status_code == 403
+
+
+def test_admin_can_provision_privileged_users(unauth_client, auth_headers):
+    """Verify that authenticated administrators can provision quality_lead or admin users."""
+    admin_headers = auth_headers("admin", "admin")
+    res = unauth_client.post("/api/v1/auth/users", json={
+        "username": "new_lead_engineer",
+        "email": "new_lead@eql-auto.internal",
+        "password": "StrongPassword2026!",
+        "full_name": "New Quality Lead",
+        "role": "quality_lead",
+        "department": "Quality Assurance"
+    }, headers=admin_headers)
+    assert res.status_code == 201
+    assert res.json()["role"] == "quality_lead"
+
+
+def test_non_admin_cannot_use_provision_endpoint(unauth_client, auth_headers):
+    """Verify that non-administrators (e.g. design_eng) cannot call /api/v1/auth/users."""
+    eng_headers = auth_headers("design_eng", "design_eng")
+    res = unauth_client.post("/api/v1/auth/users", json={
+        "username": "escalated_user",
+        "email": "escalated@eql-auto.internal",
+        "password": "Password123!",
+        "full_name": "Escalated User",
+        "role": "admin"
+    }, headers=eng_headers)
+    assert res.status_code == 403

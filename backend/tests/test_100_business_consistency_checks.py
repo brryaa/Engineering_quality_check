@@ -26,8 +26,14 @@ from app.models.models import (
     Program, Part, DFMEA, DVPR, TestRun,
     EngineeringIssue, RootCauseAnalysis, EngineeringChange, KnowledgeItem
 )
-from app.schemas.schemas import ProgramCreate, PartCreate
-from app.services.services import ProgramService, PartService
+from app.schemas.schemas import (
+    ProgramCreate, PartCreate, DFMEACreate, DVPRCreate,
+    TestRunCreate, IssueCreate, RootCauseCreate, ChangeCreate
+)
+from app.services.services import (
+    ProgramService, PartService, DFMEAService, DVPRService,
+    TestRunService, IssueService, RootCauseService, ChangeService
+)
 from app.services.fmea_engine import calculate_action_priority, calculate_rpn
 
 
@@ -523,15 +529,18 @@ def test_check_027_dfmea_db_persistence_and_relationship(db_session, base_hierar
     assert dfmea.id is not None
     assert dfmea.part.part_number == part.part_number
     assert dfmea.rpn == 96
-    assert dfmea.action_priority in ("High", "Medium", "Low")
+    # AIAG & VDA Table B: S=8, O=4, D=3 resolves strictly to "Medium" AP
+    assert dfmea.action_priority == "Medium"
 
 
 def test_check_028_dfmea_post_mitigation_rpn_monotonic_decrease(db_session, base_hierarchy):
-    """Check 028: Post-mitigation RPN must be strictly less than or equal to initial RPN."""
+    """Check 028: Post-mitigation RPN must be strictly less than initial RPN with exact arithmetic."""
     s, o, d = 9, 6, 5
     initial_rpn = calculate_rpn(s, o, d)
+    assert initial_rpn == 270  # Explicit deterministic ground truth: 9*6*5 = 270
     post_s, post_o, post_d = 9, 3, 2
     post_rpn = calculate_rpn(post_s, post_o, post_d)
+    assert post_rpn == 54      # Explicit deterministic ground truth: 9*3*2 = 54
     assert post_rpn < initial_rpn
 
 
@@ -578,14 +587,61 @@ def test_check_029_dfmea_code_uniqueness(db_session, base_hierarchy):
 
 
 def test_check_030_dfmea_high_ap_requires_recommended_action(db_session, base_hierarchy):
-    """Check 030: When Action Priority is High, recommended_action should be non-empty."""
+    """Check 030: When Action Priority is High, recommended_action is strictly mandatory."""
     part = base_hierarchy["part"]
-    s, o, d = 10, 8, 8
-    ap = calculate_action_priority(s, o, d)
-    assert ap == "High"
-    # Business logic verification: high AP requires action assignment
-    action = "Redesign latch anti-release mechanism to meet FMVSS 206"
-    assert len(action.strip()) > 0
+    # 1. Validation failure when recommended_action is whitespace or omitted on progressed High AP
+    with pytest.raises(ValueError, match="recommended_action cannot be empty or whitespace"):
+        DFMEACreate(
+            part_id=part.id,
+            fmea_code="FMEA-ERR-030",
+            item_function="FMVSS Door Latch",
+            failure_mode="Spontaneous unlatching during 30g side crash",
+            failure_effect="Door opens unexpectedly in collision",
+            severity=10,
+            cause_mechanism="Inertial pawl unseating under transverse shock",
+            occurrence=8,
+            prevention_control="Standard spring return torque",
+            detection_control="Post-crash static door latch inspection",
+            detection=8,
+            recommended_action="   "  # Blank should be rejected
+        )
+
+    with pytest.raises(ValueError, match="High Action Priority.*must specify a non-empty recommended_action"):
+        DFMEACreate(
+            part_id=part.id,
+            fmea_code="FMEA-ERR-030-B",
+            item_function="FMVSS Door Latch",
+            failure_mode="Spontaneous unlatching during 30g side crash",
+            failure_effect="Door opens unexpectedly in collision",
+            severity=10,
+            cause_mechanism="Inertial pawl unseating under transverse shock",
+            occurrence=8,
+            prevention_control="Standard spring return torque",
+            detection_control="Post-crash static door latch inspection",
+            detection=8,
+            action_status="In-Progress",
+            recommended_action=None  # Missing action on progressed High AP
+        )
+
+    # 2. Validation success when recommended_action is provided
+    valid_dfmea_in = DFMEACreate(
+        part_id=part.id,
+        fmea_code="FMEA-OK-030",
+        item_function="FMVSS Door Latch",
+        failure_mode="Spontaneous unlatching during 30g side crash",
+        failure_effect="Door opens unexpectedly in collision",
+        severity=10,
+        cause_mechanism="Inertial pawl unseating under transverse shock",
+        occurrence=8,
+        prevention_control="Standard spring return torque",
+        detection_control="Post-crash static door latch inspection",
+        detection=8,
+        recommended_action="Redesign latch anti-release mechanism to meet FMVSS 206"
+    )
+    dfmea_svc = DFMEAService(db_session)
+    dfmea_obj = dfmea_svc.create_dfmea(valid_dfmea_in)
+    assert dfmea_obj.action_priority == "High"
+    assert dfmea_obj.recommended_action == "Redesign latch anti-release mechanism to meet FMVSS 206"
 
 
 # ==============================================================================
@@ -774,9 +830,44 @@ def test_check_038_dvpr_part_program_consistency(db_session, base_hierarchy):
 
 
 def test_check_039_dvpr_acceptance_criteria_non_empty(db_session, base_hierarchy):
-    """Check 039: Acceptance criteria must contain descriptive validation metrics."""
-    criteria = "Permanent set < 15% after 200 hours exposure at 80°C"
-    assert len(criteria.strip()) >= 10
+    """Check 039: Acceptance criteria must contain descriptive validation metrics and reject empty/blank."""
+    prog = base_hierarchy["program"]
+    part = base_hierarchy["part"]
+    # 1. Reject blank/whitespace acceptance criteria
+    with pytest.raises(ValueError, match="Acceptance criteria cannot be empty"):
+        DVPRCreate(
+            program_id=prog.id,
+            part_id=part.id,
+            plan_code="DVP-BLANK-039",
+            test_phase="DV-A",
+            test_name="Thermal Aging",
+            test_standard="ISO 188",
+            acceptance_criteria="   ",
+            sample_size=3,
+            test_facility="Thermal Lab",
+            planned_start_date="2026-11-01",
+            planned_end_date="2026-11-15",
+            responsible_engineer="Eng T"
+        )
+
+    # 2. Accept valid criteria and persist via service
+    valid_dvp = DVPRCreate(
+        program_id=prog.id,
+        part_id=part.id,
+        plan_code="DVP-VALID-039",
+        test_phase="DV-A",
+        test_name="Thermal Aging",
+        test_standard="ISO 188",
+        acceptance_criteria="Permanent set < 15% after 200 hours exposure at 80°C",
+        sample_size=3,
+        test_facility="Thermal Lab",
+        planned_start_date="2026-11-01",
+        planned_end_date="2026-11-15",
+        responsible_engineer="Eng T"
+    )
+    dvp_svc = DVPRService(db_session)
+    dvp_obj = dvp_svc.create_dvpr(valid_dvp)
+    assert "Permanent set < 15%" in dvp_obj.acceptance_criteria
 
 
 def test_check_040_dvpr_query_by_phase_and_program(db_session, base_hierarchy):
@@ -952,8 +1043,21 @@ def test_check_047_test_run_cycle_count_non_negative(db_session, dvpr_fixture):
 
 
 def test_check_048_test_run_operator_mandatory(db_session, dvpr_fixture):
-    """Check 048: Test operator field must be non-empty string."""
-    r = TestRun(
+    """Check 048: Test operator field must be non-empty string and reject blank."""
+    # 1. Blank operator rejected
+    with pytest.raises(ValueError, match="Operator name cannot be empty"):
+        TestRunCreate(
+            dvpr_id=dvpr_fixture.id,
+            run_number="RUN-BLANK-048",
+            sample_id="SMP-06",
+            test_date="2026-08-09",
+            test_facility="Facility 1",
+            operator="   ",
+            result="Pass"
+        )
+
+    # 2. Valid operator accepted and persisted
+    valid_run = TestRunCreate(
         dvpr_id=dvpr_fixture.id,
         run_number="RUN-OP-048",
         sample_id="SMP-06",
@@ -962,9 +1066,9 @@ def test_check_048_test_run_operator_mandatory(db_session, dvpr_fixture):
         operator="Chen Lab Tech",
         result="Pass"
     )
-    db_session.add(r)
-    db_session.commit()
-    assert len(r.operator.strip()) > 0
+    run_svc = TestRunService(db_session)
+    run_obj = run_svc.create_test_run(valid_run)
+    assert run_obj.operator == "Chen Lab Tech"
 
 
 def test_check_049_test_run_filter_by_result(db_session, dvpr_fixture):
@@ -1094,9 +1198,45 @@ def test_check_053_issue_status_lifecycle_enumeration(db_session, base_hierarchy
 
 
 def test_check_054_issue_critical_s1_containment_mandatory(db_session, base_hierarchy):
-    """Check 054: S1-Critical issues must have containment action recorded."""
-    containment = "Quarantine batch #20260801 and 100% sort seal lip deflection with GO/NO-GO gauge"
-    assert len(containment.strip()) >= 20
+    """Check 054: S1-Critical issues in Containment or advanced status must have containment action recorded."""
+    prog = base_hierarchy["program"]
+    part = base_hierarchy["part"]
+    # 1. S1-Critical issue in Containment status without containment_action is rejected
+    with pytest.raises(ValueError, match="S1-Critical issues.*require a documented containment_action"):
+        IssueCreate(
+            issue_code="ISS-CRIT-ERR-054",
+            program_id=prog.id,
+            part_id=part.id,
+            title="Door unlatch at 60km/h test track",
+            severity="S1-Critical",
+            status="Containment",
+            description="Driver door popped open over Belgian cobblestones",
+            occurrence_phase="PV-Trial",
+            containment_action="   ",  # Missing/blank containment
+            assignee="Lead Safety Eng",
+            reporter="Track Driver",
+            due_date="2026-11-20"
+        )
+
+    # 2. S1-Critical issue with containment action is accepted and persisted
+    valid_iss = IssueCreate(
+        issue_code="ISS-CRIT-OK-054",
+        program_id=prog.id,
+        part_id=part.id,
+        title="Door unlatch at 60km/h test track",
+        severity="S1-Critical",
+        status="Containment",
+        description="Driver door popped open over Belgian cobblestones",
+        occurrence_phase="PV-Trial",
+        containment_action="Quarantine batch #20260801 and 100% sort seal lip deflection with GO/NO-GO gauge",
+        assignee="Lead Safety Eng",
+        reporter="Track Driver",
+        due_date="2026-11-20"
+    )
+    iss_svc = IssueService(db_session)
+    iss_obj = iss_svc.create_issue(valid_iss)
+    assert iss_obj.containment_action is not None
+    assert "Quarantine batch" in iss_obj.containment_action
 
 
 def test_check_055_issue_optimistic_locking_versioning(db_session, base_hierarchy):
@@ -1429,16 +1569,59 @@ def test_check_065_root_cause_verification_result_enum(db_session, issue_fixture
 
 
 def test_check_066_root_cause_analyst_name_non_empty(db_session, issue_fixture):
-    """Check 066: Analyst name is mandatory."""
-    analyst = "Senior Lead Architect Wang"
-    assert len(analyst.strip()) > 0
+    """Check 066: Analyst name is mandatory and cannot be blank or whitespace."""
+    # 1. Blank analyst name rejected by schema
+    with pytest.raises(ValueError, match="Analyst name cannot be blank"):
+        RootCauseCreate(
+            issue_id=issue_fixture.id,
+            analysis_method="5-Why",
+            direct_cause="Direct cause description",
+            systemic_root_cause="Systemic root cause description",
+            verification_method="Bench dyno test",
+            analyst="   ",
+            analyzed_at="2026-08-19"
+        )
+
+    # 2. Valid analyst name accepted and persisted
+    valid_rc = RootCauseCreate(
+        issue_id=issue_fixture.id,
+        analysis_method="5-Why",
+        direct_cause="Direct cause description",
+        systemic_root_cause="Systemic root cause description",
+        verification_method="Bench dyno test",
+        analyst="Senior Lead Architect Wang",
+        analyzed_at="2026-08-19"
+    )
+    rc_svc = RootCauseService(db_session)
+    rc_obj = rc_svc.create_root_cause(valid_rc)
+    assert rc_obj.analyst == "Senior Lead Architect Wang"
 
 
 def test_check_067_root_cause_analysis_date_format(db_session, issue_fixture):
-    """Check 067: Analyzed date follows YYYY-MM-DD standard."""
-    date_str = "2026-08-19"
-    dt = datetime.strptime(date_str, "%Y-%m-%d")
-    assert dt.year == 2026
+    """Check 067: Analyzed date must follow ISO YYYY-MM-DD standard, rejecting malformed dates."""
+    # 1. Malformed date rejected
+    with pytest.raises(ValueError, match="Analyzed date must be valid ISO format YYYY-MM-DD"):
+        RootCauseCreate(
+            issue_id=issue_fixture.id,
+            analysis_method="5-Why",
+            direct_cause="Direct cause description",
+            systemic_root_cause="Systemic root cause description",
+            verification_method="Bench dyno test",
+            analyst="Analyst Liu",
+            analyzed_at="19-08-2026"  # Malformed non-ISO date
+        )
+
+    # 2. Valid date accepted and parsed
+    valid_rc = RootCauseCreate(
+        issue_id=issue_fixture.id,
+        analysis_method="5-Why",
+        direct_cause="Direct cause description",
+        systemic_root_cause="Systemic root cause description",
+        verification_method="Bench dyno test",
+        analyst="Analyst Liu",
+        analyzed_at="2026-08-19"
+    )
+    assert valid_rc.analyzed_at == "2026-08-19"
 
 
 def test_check_068_root_cause_parent_issue_linkage(db_session, issue_fixture):
@@ -1475,9 +1658,32 @@ def test_check_069_root_cause_orphan_prevention(db_session):
 
 
 def test_check_070_root_cause_systemic_cause_mandatory(db_session, issue_fixture):
-    """Check 070: systemic_root_cause cannot be empty in quality 8D process."""
-    cause = "Process gap in engineering change notice notification to tooling suppliers"
-    assert len(cause.strip()) >= 15
+    """Check 070: systemic_root_cause cannot be empty or whitespace in quality 8D process."""
+    # 1. Blank systemic cause rejected
+    with pytest.raises(ValueError, match="systemic_root_cause cannot be empty"):
+        RootCauseCreate(
+            issue_id=issue_fixture.id,
+            analysis_method="5-Why",
+            direct_cause="Direct cause description",
+            systemic_root_cause="   ",
+            verification_method="Bench test",
+            analyst="Analyst Liu",
+            analyzed_at="2026-08-19"
+        )
+
+    # 2. Valid systemic cause accepted and persisted
+    valid_rc = RootCauseCreate(
+        issue_id=issue_fixture.id,
+        analysis_method="5-Why",
+        direct_cause="Direct cause description",
+        systemic_root_cause="Process gap in engineering change notice notification to tooling suppliers",
+        verification_method="Bench test",
+        analyst="Analyst Liu",
+        analyzed_at="2026-08-19"
+    )
+    rc_svc = RootCauseService(db_session)
+    rc_obj = rc_svc.create_root_cause(valid_rc)
+    assert "Process gap" in rc_obj.systemic_root_cause
 
 
 # ==============================================================================

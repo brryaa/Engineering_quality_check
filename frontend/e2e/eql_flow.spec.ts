@@ -16,6 +16,8 @@ test.describe('Automotive Engineering Quality Lab - End-to-End System Tests', ()
     // 3. Navigate to Programs View
     await page.click('button:has-text("车型项目")');
     await expect(page.locator('text=车型项目与研发平台管理')).toBeVisible();
+    const progSearch = page.locator('input[placeholder*="搜索项目代号"]');
+    await progSearch.fill('Aurora');
     await expect(page.locator('main').getByText('Aurora EV SUV').first()).toBeVisible();
 
     // 4. Navigate to Parts View

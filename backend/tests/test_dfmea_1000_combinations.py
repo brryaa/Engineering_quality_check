@@ -1,5 +1,44 @@
+import os
+import json
 import pytest
 from app.services.fmea_engine import calculate_rpn, calculate_action_priority
+
+
+def test_aiag_vda_1000_combinations_match_independent_authoritative_ground_truth():
+    """
+    INDEPENDENT STANDARD CONFORMANCE VERIFICATION:
+    Loads the official AIAG & VDA 2019 Table DFMEA AP (Table B) ground-truth table
+    from docs/standards/AIAG_VDA_2019_DFMEA_TABLE_B.json and compares every single cell
+    (all 1,000 combinations of S: 1..10, O: 1..10, D: 1..10).
+
+    This ensures non-circular, third-party verifiable conformance against the published handbook.
+    """
+    # Locate independent standard file
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    standard_file = os.path.join(base_dir, "docs", "standards", "AIAG_VDA_2019_DFMEA_TABLE_B.json")
+    assert os.path.exists(standard_file), f"Independent authoritative standard table not found at {standard_file}"
+
+    with open(standard_file, "r", encoding="utf-8") as f:
+        ground_truth = json.load(f)
+
+    lookup = ground_truth["lookup_cells"]
+    assert len(lookup) == 1000, "Ground truth table must contain exactly 1,000 cells."
+    assert ground_truth["distribution"]["High"] == 252
+    assert ground_truth["distribution"]["Medium"] == 234
+    assert ground_truth["distribution"]["Low"] == 514
+
+    mismatches = []
+    for s in range(1, 11):
+        for o in range(1, 11):
+            for d in range(1, 11):
+                key = f"{s},{o},{d}"
+                expected_ap = lookup[key]
+                actual_ap = calculate_action_priority(s, o, d)
+                if actual_ap != expected_ap:
+                    mismatches.append(f"Cell S={s}, O={o}, D={d}: expected={expected_ap}, got={actual_ap}")
+
+    assert len(mismatches) == 0, f"Found {len(mismatches)} mismatches against AIAG & VDA 2019 Table B:\n" + "\n".join(mismatches[:10])
+
 
 def test_dfmea_all_1000_combinations_return_valid_ap():
     """Verify that every single one of the 1,000 combinations returns valid AP."""

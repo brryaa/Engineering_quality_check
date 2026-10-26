@@ -1,6 +1,6 @@
 from typing import Optional, Generic, TypeVar, List, Any
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 from app.services.fmea_engine import calculate_rpn, calculate_action_priority
 
 T = TypeVar("T")
@@ -130,7 +130,15 @@ class DFMEABase(BaseModel):
     post_detection: Optional[int] = Field(default=None, ge=1, le=10)
 
 class DFMEACreate(DFMEABase):
-    pass
+    @model_validator(mode="after")
+    def validate_action_priority_requirements(self) -> 'DFMEACreate':
+        if self.recommended_action is not None and not self.recommended_action.strip():
+            raise ValueError("DFMEA recommended_action cannot be empty or whitespace.")
+        ap = calculate_action_priority(self.severity, self.occurrence, self.detection)
+        if ap == "High" and self.action_status in ("In-Progress", "Completed", "Closed"):
+            if not self.recommended_action or not self.recommended_action.strip():
+                raise ValueError("DFMEA items with High Action Priority (AP) must specify a non-empty recommended_action when in-progress or closed.")
+        return self
 
 class DFMEAUpdate(BaseModel):
     item_function: Optional[str] = None
@@ -178,6 +186,13 @@ class DVPRBase(BaseModel):
     status: str = Field(default="Planned", max_length=32)
     responsible_engineer: str = Field(..., max_length=64)
 
+    @field_validator("acceptance_criteria")
+    @classmethod
+    def validate_acceptance_criteria(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Acceptance criteria cannot be empty or whitespace.")
+        return v.strip()
+
 class DVPRCreate(DVPRBase):
     pass
 
@@ -220,6 +235,13 @@ class TestRunBase(BaseModel):
     failure_summary: Optional[str] = None
     report_file_url: Optional[str] = None
 
+    @field_validator("operator")
+    @classmethod
+    def validate_operator(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Operator name cannot be empty or whitespace.")
+        return v.strip()
+
 class TestRunCreate(TestRunBase):
     pass
 
@@ -232,6 +254,13 @@ class TestRunUpdate(BaseModel):
     result: Optional[str] = None
     failure_summary: Optional[str] = None
     report_file_url: Optional[str] = None
+
+    @field_validator("operator")
+    @classmethod
+    def validate_operator(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValueError("Operator name cannot be empty or whitespace.")
+        return v.strip() if v else None
 
 class TestRunResponse(TestRunBase):
     id: int
@@ -261,7 +290,12 @@ class IssueBase(BaseModel):
     closure_date: Optional[str] = None
 
 class IssueCreate(IssueBase):
-    pass
+    @model_validator(mode="after")
+    def validate_critical_issue_containment(self) -> 'IssueCreate':
+        if self.severity == "S1-Critical" and self.status in ["Containment", "Under-Investigation", "In-Analysis", "Validating", "Closed"]:
+            if not self.containment_action or not self.containment_action.strip():
+                raise ValueError("S1-Critical issues in Containment or advanced status require a documented containment_action.")
+        return self
 
 class IssueUpdate(BaseModel):
     title: Optional[str] = None
@@ -308,6 +342,31 @@ class RootCauseBase(BaseModel):
     verification_result: str = Field(default="Pending", max_length=32)
     analyst: str = Field(..., max_length=64)
     analyzed_at: str = Field(..., max_length=10)
+
+    @field_validator("analyst")
+    @classmethod
+    def validate_analyst(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Analyst name cannot be blank or whitespace.")
+        return v.strip()
+
+    @field_validator("analyzed_at")
+    @classmethod
+    def validate_analyzed_at(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Analyzed date cannot be blank.")
+        try:
+            datetime.strptime(v.strip(), "%Y-%m-%d")
+        except ValueError:
+            raise ValueError(f"Analyzed date must be valid ISO format YYYY-MM-DD, got {v}")
+        return v.strip()
+
+    @field_validator("systemic_root_cause")
+    @classmethod
+    def validate_systemic_root_cause(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("systemic_root_cause cannot be empty or whitespace.")
+        return v.strip()
 
 class RootCauseCreate(RootCauseBase):
     pass
@@ -483,9 +542,13 @@ class UserCreate(BaseModel):
     @field_validator("role")
     @classmethod
     def validate_role(cls, v: str) -> str:
-        valid_roles = {"admin", "quality_lead", "design_engineer", "viewer"}
+        valid_roles = {"admin", "quality_lead", "design_eng", "design_engineer", "auditor", "viewer"}
         if v not in valid_roles:
             raise ValueError(f"Role must be one of {sorted(valid_roles)}, got '{v}'")
+        if v == "design_engineer":
+            return "design_eng"
+        if v == "viewer":
+            return "auditor"
         return v
 
 

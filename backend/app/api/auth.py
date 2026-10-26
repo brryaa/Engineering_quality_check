@@ -9,7 +9,7 @@ from app.core.auth import (
     get_current_user, require_roles
 )
 from app.models.models import User
-from app.schemas.schemas import UserLogin, UserCreate, UserResponse, TokenResponse
+from app.schemas.schemas import UserLogin, UserCreate, UserUpdate, UserResponse, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication & RBAC"])
 
@@ -48,7 +48,55 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user account."""
+    """
+    Register a new user account (public endpoint).
+    SECURITY ENFORCEMENT: Unauthenticated self-registration can never grant privileged roles
+    such as 'admin' or 'quality_lead'. Any attempt to do so is rejected with 403 Forbidden.
+    """
+    if payload.role and payload.role in ["admin", "quality_lead"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Self-registration cannot grant administrative or quality lead roles. Contact system admin."
+        )
+
+    existing_user = db.query(User).filter(
+        (User.username == payload.username) | (User.email == payload.email)
+    ).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"User with username '{payload.username}' or email '{payload.email}' already exists."
+        )
+
+    # Base self-registered role defaults strictly to design_eng or viewer
+    assigned_role = payload.role if payload.role in ["design_eng", "auditor"] else "design_eng"
+
+    hashed = hash_password(payload.password)
+    user = User(
+        username=payload.username,
+        email=payload.email,
+        hashed_password=hashed,
+        full_name=payload.full_name,
+        role=assigned_role,
+        department=payload.department,
+        is_active=True
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return UserResponse.model_validate(user)
+
+
+@router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def create_user_by_admin(
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin"))
+):
+    """
+    Admin-only user creation endpoint.
+    Allows administrators to provision users with any role, including 'admin' and 'quality_lead'.
+    """
     existing_user = db.query(User).filter(
         (User.username == payload.username) | (User.email == payload.email)
     ).first()
@@ -64,11 +112,39 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
         email=payload.email,
         hashed_password=hashed,
         full_name=payload.full_name,
-        role=payload.role,
+        role=payload.role or "design_eng",
         department=payload.department,
         is_active=True
     )
     db.add(user)
+    db.commit()
+    db.refresh(user)
+    return UserResponse.model_validate(user)
+
+
+@router.put("/users/{user_id}/role", response_model=UserResponse)
+def update_user_role(
+    user_id: int,
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin"))
+):
+    """Admin-only endpoint to elevate or modify user roles."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with id {user_id} not found."
+        )
+    if payload.role:
+        if payload.role not in ["admin", "quality_lead", "design_eng", "auditor"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid role: {payload.role}"
+            )
+        user.role = payload.role
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
     db.commit()
     db.refresh(user)
     return UserResponse.model_validate(user)

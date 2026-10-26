@@ -92,12 +92,12 @@
   where 'Rev A.0' == 'Rev B.0'
   ```
 * **根因定位 (Root Cause)**:
-  在数据库初始化脚本 `backend/app/seeds/seed_data.py` 中，生成了 39 条状态为 `Implemented` 的工程变更记录，其 `post_change_rev` 提升至 `Rev B.0`。然而，代码仅更新了变更单本身的属性，**未触发对应 `Part.revision` 记录的级联同步**，导致数据库中存在 39 个零件仍保留已废弃的旧版本 `Rev A.0`，违反了 CMII 工程变更闭环准则。
+  在数据库初始化脚本 `backend/app/seeds/seed_data.py` 中，生成了状态为 `Implemented` 的工程变更记录，其 `post_change_rev` 提升至 `Rev B.0`。然而，初期代码仅更新了变更单本身的属性，**未触发对应 `Part.revision` 记录的级联同步**，导致数据库中存在已实施变更对应的零件仍保留已废弃的旧版本 `Rev A.0`，违反了 CMII 工程变更闭环准则。
 * **最小修复方案 (Minimal Fix)**:
-  1. 修复 `backend/app/seeds/seed_data.py` 中的种子逻辑，确保变更单状态为 `Implemented` 时，同步将 `part.revision` 更新为 `post_rev`。
+  1. 修复 `backend/app/seeds/seed_data.py` 中的种子逻辑，确保变更单状态为 `Implemented` 时，同步将 `part.revision` 更新为 `post_rev`，且正确记录变更前版本 `pre_change_rev=orig_rev`。
   2. 修复 `backend/app/services/services.py` 中的变更更新服务。
-  3. 执行修复脚本同步现存 SQLite 数据库中的 39 条失步记录。
-* **回归验证**: 重新执行状态机测试，6 个 Hypothesis 测试用例全部平稳通过。
+  3. 执行修复脚本同步现存 SQLite 数据库中全部 41 条已实施变更记录，确保 `Part.revision == EngineeringChange.post_change_rev` 且 `pre_change_rev != post_change_rev`。
+* **回归验证**: 重新执行状态机测试，6 个 Hypothesis 测试用例全部平稳通过。数据库实测验证 41 条 `Implemented` 变更与零部件版本保持 100% 严格一致（失步数归零：0）。
 
 ---
 
@@ -162,8 +162,8 @@
 | 编号 | 缺陷类型 | 发现工具 / 阶段 | 根因描述 | 修复措施 | 回归状态 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **DEF-001** | 测试薄弱点 | Mutmut 变异测试 | 算法测试使用弱集合断言 `assert ap in (...)`，导致 27 个边界变异体存活 | 升级为 AIAG & VDA 单元格精确等值断言与全等异常校验，变异杀死率提升至 100% | **PASSED** |
-| **DEF-002** | 数据一致性失步 | Hypothesis 状态机测试 | 数据库初始化时，39 条 `Implemented` ECR 记录的新版本号未同步至 `Part.revision` 主表 | 修复种子脚本级联同步逻辑，并对 SQLite 库中 39 个零件执行版本校准迁移 | **PASSED** |
-| **DEF-003** | 压测中间件拦截 | Locust 压力测试 | 安全限流中间件（300 req/min）在无差别并发压测时产生 429 节流 | 引入授信基准测试头 `X-Benchmark: 1` 穿透白名单，真实测得系统原始并发容量 | **PASSED** |
+| **DEF-002** | 数据一致性失步 | Hypothesis 状态机测试 | 数据库初始化时，`Implemented` ECR 记录的新版本号未同步至 `Part.revision` 主表 | 修复种子脚本级联同步逻辑与版本前置记录，校准并确认库中全部 41 个零件版本与已实施变更 100% 同步 | **PASSED** |
+| **DEF-003** | 压测中间件限流机制 | Locust 压力测试 | 安全限流中间件（300 req/min）在高并发压测时按安全策略产生 429 节流 | 压测环境统一通过服务配置 `RATE_LIMIT_ENABLED=false` 受控关闭限流，杜绝客户端请求头绕过安全漏洞 | **PASSED** |
 | **DEF-004** | 代码异味 / 死分支 | Mutmut 变异测试 | `compute_dvpr_status_transition` 存在同义多余条件 `and current_status != "Failed"` | 消除冗余条件，提取独立纯函数 `LifecycleEngine` 模块并达成 100% 变异覆盖 | **PASSED** |
 | **DEF-005** | 状态优先级失序 | Hypothesis 状态机测试 | `Planned` 状态的 DVP&R 执行失败试验时被过早判定为 `In Progress` 导致失败状态被吞没 | 重构状态转换判定顺序，确保 `Fail` 结果具备最高优先级直接置为 `Failed` | **PASSED** |
 
@@ -175,7 +175,7 @@
 
 ```bash
 # 1. 验证 100 个跨模块业务一致性检查
-cd /home/brrr/agy/backend
+cd /home/brrr/agy/Engineering_quality_check/backend
 PYTHONPATH=. python3 -m pytest tests/test_100_business_consistency_checks.py -v
 
 # 2. 验证 Hypothesis 对抗属性与状态机测试

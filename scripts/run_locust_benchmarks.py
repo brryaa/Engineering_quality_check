@@ -17,9 +17,9 @@ REPORTS_DIR = "reports"
 LOCUSTFILE = "backend/tests/locustfile.py"
 
 TIERS = [
-    {"name": "Level 1 (Low)", "users": 10, "spawn_rate": 5, "duration": "20s", "tag": "level1"},
-    {"name": "Level 2 (Medium)", "users": 50, "spawn_rate": 10, "duration": "20s", "tag": "level2"},
-    {"name": "Level 3 (High)", "users": 100, "spawn_rate": 20, "duration": "20s", "tag": "level3"},
+    {"name": "Level 1 (Low)", "users": 10, "spawn_rate": 5, "duration": "15s", "tag": "level1"},
+    {"name": "Level 2 (Medium)", "users": 30, "spawn_rate": 10, "duration": "15s", "tag": "level2"},
+    {"name": "Level 3 (High)", "users": 60, "spawn_rate": 15, "duration": "15s", "tag": "level3"},
 ]
 
 

@@ -5,9 +5,12 @@ import os
 backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
-real_backend = "/home/brrr/agy/backend"
-if real_backend not in sys.path:
-    sys.path.append(real_backend)
+
+# If running inside mutmut sandbox (mutants/), ensure real backend is also on sys.path
+if "mutants" in backend_dir:
+    real_backend = os.path.abspath(os.path.join(backend_dir, ".."))
+    if real_backend not in sys.path:
+        sys.path.append(real_backend)
 
 import pytest
 from sqlalchemy import create_engine, event

@@ -121,10 +121,10 @@ def seed_database():
     try:
         # 0. Seed RBAC Users
         users_config = [
-            ("admin", "admin@eql-auto.internal", "Admin@EQL2026!", "System Administrator", "admin", "Quality Systems IT"),
-            ("quality_lead", "lead.qm@eql-auto.internal", "Quality@Lead2026!", "Ying Zhao (Chief QM)", "quality_lead", "Quality Assurance"),
-            ("design_eng", "designer@eql-auto.internal", "Design@Eng2026!", "Dr. Wei Chen (Lead Engineer)", "design_engineer", "Closures & Body Engineering"),
-            ("auditor", "auditor@eql-auto.internal", "Auditor@View2026!", "Elena Rostova (Compliance Auditor)", "viewer", "Independent Audit & Compliance")
+            ("admin", "admin@eql-auto.internal", "admin123", "System Administrator", "admin", "Quality Systems IT"),
+            ("quality_lead", "lead.qm@eql-auto.internal", "quality123", "Ying Zhao (Chief QM)", "quality_lead", "Quality Assurance"),
+            ("design_eng", "designer@eql-auto.internal", "engineer123", "Dr. Wei Chen (Lead Engineer)", "design_eng", "Closures & Body Engineering"),
+            ("auditor", "auditor@eql-auto.internal", "audit123", "Elena Rostova (Compliance Auditor)", "auditor", "Independent Audit & Compliance")
         ]
         for uname, email, pwd, fname, role, dept in users_config:
             if not db.query(User).filter_by(username=uname).first():
@@ -498,6 +498,7 @@ def seed_database():
                 if stat in ["Approved", "Implemented"]:
                     approver = random.choice(ENGINEERS)
                     app_dt = (datetime.now() - timedelta(days=random.randint(5, 40))).strftime("%Y-%m-%d")
+                orig_rev = part.revision
                 post_rev = f"Rev {chr(ord(part.revision[4]) + 1)}.0" if len(part.revision) >= 5 else "Rev B.0"
                 if stat == "Implemented":
                     imp_dt = (datetime.now() - timedelta(days=random.randint(1, 10))).strftime("%Y-%m-%d")
@@ -512,7 +513,7 @@ def seed_database():
                     change_type=c_type,
                     reason=f"Corrective engineering modification prompted by issue {iss.issue_code}. "
                            f"Redesign seal cross-section / structural ribs to withstand slam fatigue.",
-                    pre_change_rev=part.revision,
+                    pre_change_rev=orig_rev,
                     post_change_rev=post_rev,
                     cost_impact_rmb=cost,
                     weight_impact_kg=weight,

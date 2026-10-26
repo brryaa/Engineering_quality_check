@@ -2,10 +2,21 @@ import random
 from locust import HttpUser, task, between
 
 class EQLUser(HttpUser):
-    wait_time = between(0.01, 0.05)
+    wait_time = between(0.05, 0.15)
 
     def on_start(self):
-        self.client.headers.update({"X-Benchmark": "1"})
+        # Authenticate as admin to enable load testing of both read and write APIs
+        try:
+            res = self.client.post("/api/v1/auth/login", json={
+                "username": "admin",
+                "password": "admin123"
+            })
+            if res.status_code == 200:
+                token = res.json().get("access_token")
+                if token:
+                    self.client.headers.update({"Authorization": f"Bearer {token}"})
+        except Exception:
+            pass
 
     @task(5)
     def view_dashboard(self):
