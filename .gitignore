@@ -1,0 +1,40 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Node dependencies & caches
+node_modules/
+frontend/node_modules/
+.npm/
+.eslintcache
+
+# Build outputs
+frontend/dist/
+dist/
+build/
+
+# Testing & coverage caches
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+mutants/
+backend/mutants/
+.mutmut-cache
+
+# Database wal/shm temporary files
+*.db-shm
+*.db-wal
+
+# OS files
+.DS_Store
+Thumbs.db
