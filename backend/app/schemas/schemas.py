@@ -24,6 +24,27 @@ class ProgramBase(BaseModel):
     target_market: str = Field(default="Global", max_length=64)
     description: Optional[str] = None
 
+    @field_validator("code")
+    @classmethod
+    def normalize_code(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Program code cannot be empty.")
+        return v.strip().upper()
+
+    @field_validator("platform")
+    @classmethod
+    def validate_platform(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Program platform cannot be empty or blank.")
+        return v.strip()
+
+    @field_validator("name", "lead_engineer", "quality_manager")
+    @classmethod
+    def validate_non_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Field cannot be empty or whitespace.")
+        return v.strip()
+
 class ProgramCreate(ProgramBase):
     pass
 
@@ -55,8 +76,15 @@ class PartBase(BaseModel):
     supplier: str = Field(..., max_length=128)
     material: str = Field(..., max_length=128)
     revision: str = Field(default="Rev A.0", max_length=16)
-    weight_kg: float = Field(default=1.0, ge=0.0)
+    weight_kg: float = Field(default=1.0, gt=0.0)
     safety_critical: bool = False
+
+    @field_validator("subsystem", "supplier", "material", "revision")
+    @classmethod
+    def validate_part_text(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Field cannot be empty or whitespace.")
+        return v.strip()
 
 class PartCreate(PartBase):
     pass
@@ -68,7 +96,7 @@ class PartUpdate(BaseModel):
     supplier: Optional[str] = None
     material: Optional[str] = None
     revision: Optional[str] = None
-    weight_kg: Optional[float] = None
+    weight_kg: Optional[float] = Field(default=None, gt=0.0)
     safety_critical: Optional[bool] = None
 
 class PartResponse(PartBase):
@@ -436,3 +464,56 @@ class KnowledgeItemResponse(KnowledgeItemBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ----------------- User & Authentication Schemas -----------------
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class UserCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=64)
+    email: str = Field(..., min_length=5, max_length=128)
+    password: str = Field(..., min_length=6, max_length=128)
+    full_name: str = Field(..., min_length=2, max_length=128)
+    role: str = Field(default="viewer", max_length=32)
+    department: str = Field(default="Engineering Quality", max_length=64)
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        valid_roles = {"admin", "quality_lead", "design_engineer", "viewer"}
+        if v not in valid_roles:
+            raise ValueError(f"Role must be one of {sorted(valid_roles)}, got '{v}'")
+        return v
+
+
+class UserUpdate(BaseModel):
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    department: Optional[str] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = None
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    full_name: str
+    role: str
+    department: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    expires_in_minutes: int
+    user: UserResponse

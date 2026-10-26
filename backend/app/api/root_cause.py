@@ -2,7 +2,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.models.models import RootCauseAnalysis
+from app.core.auth import get_current_user, require_roles
+from app.models.models import RootCauseAnalysis, User
 from app.schemas.schemas import RootCauseCreate, RootCauseUpdate, RootCauseResponse, PaginatedResponse
 from app.services.services import RootCauseService
 
@@ -59,18 +60,31 @@ def get_root_cause_by_issue(issue_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=RootCauseResponse, status_code=status.HTTP_201_CREATED)
-def create_root_cause(payload: RootCauseCreate, db: Session = Depends(get_db)):
+def create_root_cause(
+    payload: RootCauseCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     rc = RootCauseService(db).create_root_cause(payload)
     return _to_response(rc)
 
 
 @router.put("/{rc_id}", response_model=RootCauseResponse)
-def update_root_cause(rc_id: int, payload: RootCauseUpdate, db: Session = Depends(get_db)):
+def update_root_cause(
+    rc_id: int,
+    payload: RootCauseUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     rc = RootCauseService(db).update_root_cause(rc_id, payload)
     return _to_response(rc)
 
 
 @router.delete("/{rc_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_root_cause(rc_id: int, db: Session = Depends(get_db)):
+def delete_root_cause(
+    rc_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead"))
+):
     RootCauseService(db).delete_root_cause(rc_id)
     return None

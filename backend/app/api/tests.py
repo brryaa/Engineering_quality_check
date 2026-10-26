@@ -2,6 +2,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.auth import get_current_user, require_roles
+from app.models.models import User
 from app.schemas.schemas import TestRunCreate, TestRunUpdate, TestRunResponse, PaginatedResponse
 from app.services.services import TestRunService
 
@@ -44,7 +46,11 @@ def get_test_run(test_id: int, db: Session = Depends(get_db)):
     return resp
 
 @router.post("", response_model=TestRunResponse, status_code=status.HTTP_201_CREATED)
-def create_test_run(payload: TestRunCreate, db: Session = Depends(get_db)):
+def create_test_run(
+    payload: TestRunCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     test_run = TestRunService(db).create_test_run(payload)
     resp = TestRunResponse.model_validate(test_run)
     resp.plan_code = test_run.dvpr.plan_code if test_run.dvpr else None
@@ -52,7 +58,12 @@ def create_test_run(payload: TestRunCreate, db: Session = Depends(get_db)):
     return resp
 
 @router.put("/{test_id}", response_model=TestRunResponse)
-def update_test_run(test_id: int, payload: TestRunUpdate, db: Session = Depends(get_db)):
+def update_test_run(
+    test_id: int,
+    payload: TestRunUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     test_run = TestRunService(db).update_test_run(test_id, payload)
     resp = TestRunResponse.model_validate(test_run)
     resp.plan_code = test_run.dvpr.plan_code if test_run.dvpr else None
@@ -60,6 +71,10 @@ def update_test_run(test_id: int, payload: TestRunUpdate, db: Session = Depends(
     return resp
 
 @router.delete("/{test_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_test_run(test_id: int, db: Session = Depends(get_db)):
+def delete_test_run(
+    test_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead"))
+):
     TestRunService(db).delete_test_run(test_id)
     return None

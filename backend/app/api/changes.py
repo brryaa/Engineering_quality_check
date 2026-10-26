@@ -1,8 +1,9 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.models.models import EngineeringChange
+from app.core.auth import get_current_user, require_roles
+from app.models.models import EngineeringChange, User
 from app.schemas.schemas import ChangeCreate, ChangeUpdate, ChangeResponse, PaginatedResponse
 from app.services.services import ChangeService
 
@@ -59,18 +60,38 @@ def get_change(change_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=ChangeResponse, status_code=status.HTTP_201_CREATED)
-def create_change(payload: ChangeCreate, db: Session = Depends(get_db)):
+def create_change(
+    payload: ChangeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     ecr = ChangeService(db).create_change(payload)
     return _to_response(ecr)
 
 
 @router.put("/{change_id}", response_model=ChangeResponse)
-def update_change(change_id: int, payload: ChangeUpdate, db: Session = Depends(get_db)):
+def update_change(
+    change_id: int,
+    payload: ChangeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
+    # Enforce vertical separation of duty: Only Quality Lead or Admin can approve or implement an ECR
+    if payload.approval_status in ("Approved", "Implemented") and current_user.role not in ("admin", "quality_lead"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Operation forbidden. Only Quality Lead or Admin can set change status to '{payload.approval_status}'. Your role is '{current_user.role}'."
+        )
+
     ecr = ChangeService(db).update_change(change_id, payload)
     return _to_response(ecr)
 
 
 @router.delete("/{change_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_change(change_id: int, db: Session = Depends(get_db)):
+def delete_change(
+    change_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead"))
+):
     ChangeService(db).delete_change(change_id)
     return None

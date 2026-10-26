@@ -258,6 +258,21 @@ class KnowledgeItem(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(64), unique=True, nullable=False, index=True)
+    email = Column(String(128), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(256), nullable=False)
+    full_name = Column(String(128), nullable=False)
+    role = Column(String(32), nullable=False, default="viewer", index=True)  # admin, quality_lead, design_engineer, viewer
+    department = Column(String(64), nullable=False, default="Engineering Quality")
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
 # Additional compound indexes for high performance query & analytics
 Index("ix_dfmea_part_rpn", DFMEA.part_id, DFMEA.rpn)
 Index("ix_dvpr_prog_status", DVPR.program_id, DVPR.status)

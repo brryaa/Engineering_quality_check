@@ -133,3 +133,62 @@ npx playwright test e2e/comprehensive_acceptance.spec.ts
 | **WP10** | [docs/WP10_ENGINEERING_QUALITY_CHALLENGES.md](docs/WP10_ENGINEERING_QUALITY_CHALLENGES.md) | 五类车门/密封系统工程挑战全链路闭环追溯验证 |
 | **WP11** | [docs/WP11_CI_AND_MAINTAINABILITY.md](docs/WP11_CI_AND_MAINTAINABILITY.md) | 统一 CI 流水线、严格类型静态检查与构建工程化 |
 | **WP12** | [docs/WP12_INDEPENDENT_AUDIT_REPORT.md](docs/WP12_INDEPENDENT_AUDIT_REPORT.md) | 独立第三方工程质量审查挑战、缺陷挖掘修复与终验报告 |
+| **同行审计加固** | [docs/PEER_AUDIT_HARDENING.md](docs/PEER_AUDIT_HARDENING.md) | 针对第一轮同行审计反馈的 6 大安全、权限、算法与测试严密性全面加固报告 |
+
+---
+
+## 七、同行独立代码审计加固说明 (Peer Code Audit Hardening - 2026-10)
+
+针对开源同行与独立安全审计提出的第一轮 6 项高风险/严密性反馈，本项目实施了彻底的工程重构与代码级安全加固：
+
+### 1. 限流逻辑防御加固 (彻底废除 X-Benchmark 客户端豁免)
+- **缺陷**：此前在中间件中允许任意客户端发送 `X-Benchmark: 1` 请求头跳过 300 次/分钟限流。
+- **加固**：彻底移除 `security_middleware.py` 中的 `X-Benchmark` 客户端请求头豁免逻辑。生产环境严格执行 IP 级滑动窗口限流；压测环境统一通过服务端系统环境变量 `RATE_LIMIT_ENABLED=false` 配置控制。
+- **验证**：`test_rate_limiting_defense_and_x_benchmark_cannot_bypass` 验证携带 `X-Benchmark: 1` 仍然被 429 阻断。
+
+### 2. 请求头 Content-Length 健壮性防御
+- **缺陷**：非数字或负数 Content-Length 请求头会导致 `int()` 抛出未捕获的 ValueError，引发非预期的 500 服务器内部错误。
+- **加固**：使用 `try...except (ValueError, TypeError)` 严密捕获请求头非法值，并增加负数校验；非法请求头直接返回 HTTP 400 Bad Request，超大包体（>5MB）严格返回 HTTP 413。
+- **验证**：`test_malformed_content_length_headers` 覆盖非数字与负数畸形请求头。
+
+### 3. 企业级 JWT 身份认证与 RBAC 细粒度权限控制
+- **缺陷**：API 路由此前仅依赖数据库会话 `get_db`，未对外部请求实施身份验证与基于角色的访问控制。
+- **加固**：
+  - 构建 `User` 模型，支持 `admin`、`quality_lead`、`design_engineer`、`viewer` 四级工程权限角色。
+  - 实现基于 `bcrypt` 的安全密码哈希（12 轮加盐）与标准 `PyJWT` (HS256) 签名验证。
+  - 新增 `/api/v1/auth/login`、`/register`、`/me`、`/users` 统一认证服务。
+  - 为全部 10 个业务模块的变更路由（POST, PUT, DELETE）挂载 `require_roles(...)` 依赖守护。
+  - 平台内置标准角色测试账号（详见下表）。
+- **验证**：`test_auth_api.py` (8 项全覆盖) 与 `test_unauthenticated_mutations_rejected`。
+
+| 角色 (Role) | 预设账号 | 默认密码 | 权限职责 |
+| :--- | :--- | :--- | :--- |
+| **admin** | `admin` | `Admin@EQL2026!` | 系统最高管理员，管理用户与全模块数据，拥有车型与知识文档唯一删除权 |
+| **quality_lead** | `quality_lead` | `Quality@Lead2026!` | 质量经理，创建/维护车型与零部件，唯一拥有 ECR 变更批准/生效与 DFMEA 审批权 |
+| **design_engineer** | `design_eng` | `Design@Eng2026!` | 研发设计工程师，创建零件、录入 DVP&R 与试验台架数据，草拟 ECR 变更单 |
+| **viewer** | `auditor` | `Auditor@View2026!` | 独立合规审查员，全局只读访问，任何增删改均被 403 Forbidden 严格阻断 |
+
+### 4. 真实 IDOR 越权与垂直提权对抗测试重写
+- **缺陷**：此前 IDOR 测试仅验证了不存在的 `program_id` 触发外键约束 400，未真正测试水平与垂直越权。
+- **加固**：
+  - **垂直提权测试**：`viewer` 角色尝试创建车型、添加零件、发起 ECR，均被 403 阻断；`design_engineer` 尝试删除整车车型或擅自审批 ECR 变更单，均被 403 阻断。
+  - **职责分离 (SoD) 测试**：研发工程师创建 Draft 变更单允许通过（201），但调用审批接口尝试自批时返回 403，只有 `quality_lead` 或 `admin` 审批才能返回 200。
+  - **水平隔离测试**：验证跨车型项目零部件绑架、跨项目资源非法篡改的强校验与隔离。
+
+### 5. 跨模块业务一致性检查 (100 项) 对抗性负向加固
+- **缺陷**：此前 Check 003（平台分类）、Check 008（大写规范）、Check 014（零件重量正数）等测试仅做了 Happy Path 断言，未真正测试非法输入被系统拒绝。
+- **加固**：
+  - Check 003：主动输入空字符串与非法字符平台，验证被 Pydantic/Service 严格抛出校验异常拒绝。
+  - Check 007：主动传入空责任工程师或空质量经理，验证被系统拒绝。
+  - Check 008：主动向 API/Service 传入全小写代码 `"p-lower-case-08"`，验证系统自适应无感规范化为大写 `"P-LOWER-CASE-08"`。
+  - Check 014：主动传入 `weight_kg = 0.0` 和负数 `weight_kg = -2.5`，验证被系统直接拒绝。
+  - Check 017 & 018：主动传入空白材料与供方，验证被强类型规则直接拒绝。
+
+### 6. DFMEA 算法严格类型防线与 AIAG & VDA 2019 表 B 1000 格数学证明
+- **缺陷**：Python 中 `issubclass(bool, int) is True`，导致此前 `isinstance(True, int)` 绕过了类型校验。
+- **加固**：
+  - 重构 `_validate_sod()`，采用 `type(val) is not int or isinstance(val, bool)` 双重严密防线，彻底杜绝布尔值漏网。
+  - 同步为 `calculate_rpn` 和 `calculate_action_priority` 挂载此类型检查。
+  - **数学级分布核实**：针对 AIAG & VDA 2019 Table B 全部 1,000 种 S/O/D 组合进行全矩阵穷举，经数学推导与全量断言严格确认分布为：
+    $$\text{High (H)} = 252,\quad \text{Medium (M)} = 234,\quad \text{Low (L)} = 514,\quad \sum = 1000$$
+- **验证**：`test_dfmea_1000_combinations.py` 严格断言 `high_count == 252`, `medium_count == 234`, `low_count == 514`，并全面对 `True` / `False` 注入断言 `TypeError`。

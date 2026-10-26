@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal, engine, Base
 from app.models.models import (
     Program, Part, DFMEA, DVPR, TestRun, EngineeringIssue,
-    RootCauseAnalysis, EngineeringChange, KnowledgeItem
+    RootCauseAnalysis, EngineeringChange, KnowledgeItem, User
 )
+from app.core.auth import hash_password
 from app.services.fmea_engine import calculate_rpn, calculate_action_priority
 from app.core.logging import logger
 
@@ -118,10 +119,30 @@ def seed_database():
     db: Session = SessionLocal()
 
     try:
+        # 0. Seed RBAC Users
+        users_config = [
+            ("admin", "admin@eql-auto.internal", "Admin@EQL2026!", "System Administrator", "admin", "Quality Systems IT"),
+            ("quality_lead", "lead.qm@eql-auto.internal", "Quality@Lead2026!", "Ying Zhao (Chief QM)", "quality_lead", "Quality Assurance"),
+            ("design_eng", "designer@eql-auto.internal", "Design@Eng2026!", "Dr. Wei Chen (Lead Engineer)", "design_engineer", "Closures & Body Engineering"),
+            ("auditor", "auditor@eql-auto.internal", "Auditor@View2026!", "Elena Rostova (Compliance Auditor)", "viewer", "Independent Audit & Compliance")
+        ]
+        for uname, email, pwd, fname, role, dept in users_config:
+            if not db.query(User).filter_by(username=uname).first():
+                db.add(User(
+                    username=uname,
+                    email=email,
+                    hashed_password=hash_password(pwd),
+                    full_name=fname,
+                    role=role,
+                    department=dept,
+                    is_active=True
+                ))
+        db.commit()
+
         # Check existing count
         existing_programs = db.query(Program).count()
         if existing_programs >= 10:
-            logger.info("Database already seeded with programs. Ensuring counts...")
+            logger.info("Database already seeded with programs and users. Ready.")
             return
 
         logger.info("Starting high-fidelity automotive database seeding...")

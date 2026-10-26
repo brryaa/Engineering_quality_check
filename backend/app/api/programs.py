@@ -2,6 +2,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.auth import get_current_user, require_roles
+from app.models.models import User
 from app.schemas.schemas import ProgramCreate, ProgramUpdate, ProgramResponse, PaginatedResponse
 from app.services.services import ProgramService
 
@@ -32,14 +34,27 @@ def get_program(program_id: int, db: Session = Depends(get_db)):
     return ProgramService(db).get_program(program_id)
 
 @router.post("", response_model=ProgramResponse, status_code=status.HTTP_201_CREATED)
-def create_program(payload: ProgramCreate, db: Session = Depends(get_db)):
+def create_program(
+    payload: ProgramCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead"))
+):
     return ProgramService(db).create_program(payload)
 
 @router.put("/{program_id}", response_model=ProgramResponse)
-def update_program(program_id: int, payload: ProgramUpdate, db: Session = Depends(get_db)):
+def update_program(
+    program_id: int,
+    payload: ProgramUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead"))
+):
     return ProgramService(db).update_program(program_id, payload)
 
 @router.delete("/{program_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_program(program_id: int, db: Session = Depends(get_db)):
+def delete_program(
+    program_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin"))
+):
     ProgramService(db).delete_program(program_id)
     return None

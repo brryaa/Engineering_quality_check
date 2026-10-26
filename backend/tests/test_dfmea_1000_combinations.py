@@ -26,10 +26,10 @@ def test_dfmea_all_1000_combinations_return_valid_ap():
 
     assert count == 1000
     print(f"\n[AIAG-VDA 2019 AP Distribution out of 1000]: High={high_count}, Medium={medium_count}, Low={low_count}")
-    # High must be substantial (critical safety items), Low must be largest
-    assert high_count > 100
-    assert medium_count > 100
-    assert low_count > 400
+    # Canonical cell count matching AIAG & VDA FMEA 1st Edition Table B
+    assert high_count == 252
+    assert medium_count == 234
+    assert low_count == 514
 
 def test_dfmea_monotonic_risk_properties():
     """Verify monotonicity: higher severity, occurrence, or detection never decreases action priority."""
@@ -98,7 +98,8 @@ def test_dfmea_boundary_and_illegal_inputs():
             calculate_rpn(5, 5, invalid_val)
 
     # Strict type errors for all parameters with exact exception message check (kills mutmut_5)
-    for bad in ["5", 5.5, None, [5], {"val": 5}]:
+    # Includes booleans (True, False) because in Python issubclass(bool, int) is True, which must be rejected
+    for bad in ["5", 5.5, None, [5], {"val": 5}, True, False]:
         with pytest.raises(TypeError) as exc_info:
             calculate_action_priority(bad, 5, 5)  # type: ignore
         assert str(exc_info.value) == "Severity, Occurrence, and Detection must be integers."
@@ -109,6 +110,10 @@ def test_dfmea_boundary_and_illegal_inputs():
 
         with pytest.raises(TypeError) as exc_info:
             calculate_action_priority(5, 5, bad)  # type: ignore
+        assert str(exc_info.value) == "Severity, Occurrence, and Detection must be integers."
+
+        with pytest.raises(TypeError) as exc_info:
+            calculate_rpn(bad, 5, 5)  # type: ignore
         assert str(exc_info.value) == "Severity, Occurrence, and Detection must be integers."
 
     # ================= MUTATION KILLERS: EXACT AP BOUNDARY CELLS =================

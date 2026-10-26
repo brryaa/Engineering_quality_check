@@ -2,6 +2,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.auth import get_current_user, require_roles
+from app.models.models import User
 from app.schemas.schemas import DVPRCreate, DVPRUpdate, DVPRResponse, PaginatedResponse
 from app.services.services import DVPRService
 
@@ -49,7 +51,11 @@ def get_dvpr(dvpr_id: int, db: Session = Depends(get_db)):
     return resp
 
 @router.post("", response_model=DVPRResponse, status_code=status.HTTP_201_CREATED)
-def create_dvpr(payload: DVPRCreate, db: Session = Depends(get_db)):
+def create_dvpr(
+    payload: DVPRCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     dvpr = DVPRService(db).create_dvpr(payload)
     resp = DVPRResponse.model_validate(dvpr)
     resp.program_code = dvpr.program.code if dvpr.program else None
@@ -58,7 +64,12 @@ def create_dvpr(payload: DVPRCreate, db: Session = Depends(get_db)):
     return resp
 
 @router.put("/{dvpr_id}", response_model=DVPRResponse)
-def update_dvpr(dvpr_id: int, payload: DVPRUpdate, db: Session = Depends(get_db)):
+def update_dvpr(
+    dvpr_id: int,
+    payload: DVPRUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     dvpr = DVPRService(db).update_dvpr(dvpr_id, payload)
     resp = DVPRResponse.model_validate(dvpr)
     resp.program_code = dvpr.program.code if dvpr.program else None
@@ -67,6 +78,10 @@ def update_dvpr(dvpr_id: int, payload: DVPRUpdate, db: Session = Depends(get_db)
     return resp
 
 @router.delete("/{dvpr_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_dvpr(dvpr_id: int, db: Session = Depends(get_db)):
+def delete_dvpr(
+    dvpr_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead"))
+):
     DVPRService(db).delete_dvpr(dvpr_id)
     return None

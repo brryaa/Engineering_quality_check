@@ -1,11 +1,12 @@
 from fastapi import APIRouter
 from app.api import (
-    programs, parts, dfmea, dvpr, tests,
+    auth, programs, parts, dfmea, dvpr, tests,
     issues, root_cause, changes, dashboard, knowledge,
     traceability
 )
 
 api_router = APIRouter()
+api_router.include_router(auth.router)
 api_router.include_router(programs.router)
 api_router.include_router(parts.router)
 api_router.include_router(dfmea.router)

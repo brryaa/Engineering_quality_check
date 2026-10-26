@@ -2,6 +2,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.auth import get_current_user, require_roles
+from app.models.models import User
 from app.schemas.schemas import PartCreate, PartUpdate, PartResponse, PaginatedResponse
 from app.services.services import PartService
 
@@ -45,20 +47,33 @@ def get_part(part_id: int, db: Session = Depends(get_db)):
     return resp
 
 @router.post("", response_model=PartResponse, status_code=status.HTTP_201_CREATED)
-def create_part(payload: PartCreate, db: Session = Depends(get_db)):
+def create_part(
+    payload: PartCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     part = PartService(db).create_part(payload)
     resp = PartResponse.model_validate(part)
     resp.program_code = part.program.code if part.program else None
     return resp
 
 @router.put("/{part_id}", response_model=PartResponse)
-def update_part(part_id: int, payload: PartUpdate, db: Session = Depends(get_db)):
+def update_part(
+    part_id: int,
+    payload: PartUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     part = PartService(db).update_part(part_id, payload)
     resp = PartResponse.model_validate(part)
     resp.program_code = part.program.code if part.program else None
     return resp
 
 @router.delete("/{part_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_part(part_id: int, db: Session = Depends(get_db)):
+def delete_part(
+    part_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead"))
+):
     PartService(db).delete_part(part_id)
     return None

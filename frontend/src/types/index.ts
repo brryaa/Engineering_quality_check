@@ -10,6 +10,25 @@ export interface PaginatedResponse<T> {
 
 export type int = number;
 
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  full_name: string;
+  role: 'admin' | 'quality_lead' | 'design_engineer' | 'viewer';
+  department: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in_minutes: number;
+  user: User;
+}
+
 export interface Program {
   id: number;
   code: string;

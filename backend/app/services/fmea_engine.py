@@ -4,11 +4,25 @@ Action Priority (AP) calculation engine.
 Table DFMEA AP (Action Priority) Table B.
 """
 
+def _validate_sod(severity: int, occurrence: int, detection: int) -> None:
+    # In Python, bool is a subclass of int (isinstance(True, int) is True).
+    # We strictly verify that each argument is a pure int and not a boolean.
+    for val in (severity, occurrence, detection):
+        if type(val) is not int or isinstance(val, bool):
+            raise TypeError("Severity, Occurrence, and Detection must be integers.")
+    if not (1 <= severity <= 10 and 1 <= occurrence <= 10 and 1 <= detection <= 10):
+        raise ValueError(f"S, O, D must be integers in range [1, 10]. Got S={severity}, O={occurrence}, D={detection}")
+
+
 def calculate_rpn(severity: int, occurrence: int, detection: int) -> int:
     """Calculate traditional Risk Priority Number (RPN = S * O * D)."""
+    for val in (severity, occurrence, detection):
+        if type(val) is not int or isinstance(val, bool):
+            raise TypeError("Severity, Occurrence, and Detection must be integers.")
     if not (1 <= severity <= 10 and 1 <= occurrence <= 10 and 1 <= detection <= 10):
         raise ValueError(f"S, O, D must be between 1 and 10. Got S={severity}, O={occurrence}, D={detection}")
     return severity * occurrence * detection
+
 
 def calculate_action_priority(severity: int, occurrence: int, detection: int) -> str:
     """
@@ -16,10 +30,7 @@ def calculate_action_priority(severity: int, occurrence: int, detection: int) ->
     AIAG & VDA FMEA 1st Edition (2019) Standard Table B.
     Validates range 1-10 for Severity, Occurrence, Detection.
     """
-    if not (isinstance(severity, int) and isinstance(occurrence, int) and isinstance(detection, int)):
-        raise TypeError("Severity, Occurrence, and Detection must be integers.")
-    if not (1 <= severity <= 10 and 1 <= occurrence <= 10 and 1 <= detection <= 10):
-        raise ValueError(f"S, O, D must be integers in range [1, 10]. Got S={severity}, O={occurrence}, D={detection}")
+    _validate_sod(severity, occurrence, detection)
 
     s, o, d = severity, occurrence, detection
 

@@ -12,6 +12,17 @@ class Settings(BaseModel):
     # SQLite configuration with WAL mode (defaults to backend directory)
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
 
+    # Security & Rate Limiting
+    RATE_LIMIT_ENABLED: bool = os.getenv("RATE_LIMIT_ENABLED", "true").lower() in ("true", "1", "yes")
+    RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "300"))
+    RATE_LIMIT_WINDOW_SECONDS: int = 60
+    MAX_BODY_SIZE_BYTES: int = 5 * 1024 * 1024  # 5 MB
+
+    # Authentication & JWT
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "eql-automotive-engineering-secret-key-change-in-production-2026")
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost",

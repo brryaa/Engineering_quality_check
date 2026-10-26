@@ -2,12 +2,17 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.database import SessionLocal
-from app.models.models import Program, Part, DVPR, EngineeringIssue, EngineeringChange, RootCauseAnalysis
+from app.core.auth import get_current_user
+from app.models.models import Program, Part, DVPR, EngineeringIssue, EngineeringChange, RootCauseAnalysis, User
 
 
 @pytest.fixture
 def audit_client():
-    return TestClient(app)
+    admin = User(id=1, username="admin", role="admin", is_active=True, email="admin@audit.local", full_name="Admin", department="Audit")
+    app.dependency_overrides[get_current_user] = lambda: admin
+    with TestClient(app) as client:
+        yield client
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 @pytest.fixture

@@ -2,6 +2,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.auth import get_current_user, require_roles
+from app.models.models import User
 from app.schemas.schemas import KnowledgeItemCreate, KnowledgeItemUpdate, KnowledgeItemResponse, PaginatedResponse
 from app.services.services import KnowledgeService
 
@@ -47,16 +49,29 @@ def get_knowledge_item(kb_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=KnowledgeItemResponse, status_code=status.HTTP_201_CREATED)
-def create_knowledge_item(payload: KnowledgeItemCreate, db: Session = Depends(get_db)):
+def create_knowledge_item(
+    payload: KnowledgeItemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     return KnowledgeService(db).create_knowledge_item(payload)
 
 
 @router.put("/{kb_id}", response_model=KnowledgeItemResponse)
-def update_knowledge_item(kb_id: int, payload: KnowledgeItemUpdate, db: Session = Depends(get_db)):
+def update_knowledge_item(
+    kb_id: int,
+    payload: KnowledgeItemUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     return KnowledgeService(db).update_knowledge_item(kb_id, payload)
 
 
 @router.delete("/{kb_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_knowledge_item(kb_id: int, db: Session = Depends(get_db)):
+def delete_knowledge_item(
+    kb_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin"))
+):
     KnowledgeService(db).delete_knowledge_item(kb_id)
     return None

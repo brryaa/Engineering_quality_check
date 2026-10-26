@@ -26,6 +26,8 @@ from app.models.models import (
     Program, Part, DFMEA, DVPR, TestRun,
     EngineeringIssue, RootCauseAnalysis, EngineeringChange, KnowledgeItem
 )
+from app.schemas.schemas import ProgramCreate, PartCreate
+from app.services.services import ProgramService, PartService
 from app.services.fmea_engine import calculate_action_priority, calculate_rpn
 
 
@@ -107,7 +109,19 @@ def test_check_002_program_sop_date_format_validation(db_session):
 
 
 def test_check_003_program_platform_classification(db_session):
-    """Check 003: Platform string must describe recognized automotive architecture."""
+    """Check 003: Platform string must describe recognized automotive architecture and reject empty/blank platforms."""
+    # 1. Rejection of blank / whitespace platform
+    with pytest.raises(ValueError):
+        ProgramCreate(
+            code="P-PLATFORM-FAIL",
+            name="Invalid Platform Arch",
+            platform="   ",  # Blank platform rejected
+            phase="Proto-A",
+            lead_engineer="Lead",
+            quality_manager="QM"
+        )
+
+    # 2. Acceptance of valid automotive platform architectures
     valid_platforms = ["EV-800V", "PHEV-Modular", "BEV-Skateboard", "ICE-Modular"]
     prog = Program(
         code="P-PLATFORM-03",
@@ -174,7 +188,27 @@ def test_check_006_program_multiple_parts_parent_integrity(db_session, base_hier
 
 
 def test_check_007_program_lead_and_qm_cannot_be_empty(db_session):
-    """Check 007: Program must have designated Lead Engineer and Quality Manager."""
+    """Check 007: Program must have designated Lead Engineer and Quality Manager; empty strings rejected."""
+    # 1. Rejection of empty lead engineer
+    with pytest.raises(ValueError):
+        ProgramCreate(
+            code="P-ENG-FAIL-1",
+            name="Missing Lead",
+            platform="EV-800V",
+            lead_engineer="",
+            quality_manager="QM"
+        )
+
+    # 2. Rejection of whitespace-only quality manager
+    with pytest.raises(ValueError):
+        ProgramCreate(
+            code="P-ENG-FAIL-2",
+            name="Missing QM",
+            platform="EV-800V",
+            lead_engineer="Lead",
+            quality_manager="   "
+        )
+
     prog = Program(
         code="P-ENG-07",
         name="Engineer Accountability",
@@ -190,18 +224,19 @@ def test_check_007_program_lead_and_qm_cannot_be_empty(db_session):
 
 
 def test_check_008_program_code_case_insensitivity_normalization(db_session):
-    """Check 008: Program codes should be normalized uppercase strings."""
-    code = "p-lower-case-08"
-    prog = Program(
-        code=code.upper(),
+    """Check 008: Program codes should be normalized uppercase strings automatically."""
+    payload = ProgramCreate(
+        code="p-lower-case-08",  # Passed in lowercase
         name="Uppercase Code Program",
         platform="EV-800V",
         phase="Proto-A",
         lead_engineer="Lead",
         quality_manager="QM"
     )
-    db_session.add(prog)
-    db_session.commit()
+    # Validator auto-normalizes code to uppercase
+    assert payload.code == "P-LOWER-CASE-08"
+
+    prog = ProgramService(db_session).create_program(payload)
     assert prog.code == "P-LOWER-CASE-08"
 
 
@@ -259,7 +294,20 @@ def test_check_011_part_number_uniqueness(db_session, base_hierarchy):
 
 
 def test_check_012_part_subsystem_taxonomy(db_session, base_hierarchy):
-    """Check 012: Part subsystem must belong to closures and sealing taxonomy."""
+    """Check 012: Part subsystem must belong to closures and sealing taxonomy and reject blank."""
+    # 1. Rejection of blank subsystem
+    with pytest.raises(ValueError):
+        PartCreate(
+            program_id=base_hierarchy["program"].id,
+            part_number="PART-SUBSYS-FAIL",
+            name="No Subsystem",
+            subsystem="   ",
+            category="Mechanical",
+            supplier="Supplier",
+            material="Steel",
+            weight_kg=1.0
+        )
+
     valid_subsystems = {
         "Primary Body Seal", "Secondary Door Seal", "Glass Regulator Module",
         "Front Door Closure", "Rear Door Closure", "Powered Tailgate Actuation",
@@ -270,7 +318,21 @@ def test_check_012_part_subsystem_taxonomy(db_session, base_hierarchy):
 
 
 def test_check_013_part_revision_format_standard(db_session, base_hierarchy):
-    """Check 013: Part revision follows standard 'Rev [A-Z].[0-9]' syntax."""
+    """Check 013: Part revision follows standard 'Rev [A-Z].[0-9]' syntax and rejects blank revision."""
+    # 1. Rejection of blank revision
+    with pytest.raises(ValueError):
+        PartCreate(
+            program_id=base_hierarchy["program"].id,
+            part_number="PART-REV-FAIL",
+            name="Invalid Revision Part",
+            subsystem="Primary Body Seal",
+            category="Elastomer",
+            supplier="Supplier",
+            material="Rubber",
+            revision="   ",  # Empty rejected
+            weight_kg=1.0
+        )
+
     part = base_hierarchy["part"]
     assert part.revision.startswith("Rev ")
     rev_code = part.revision.replace("Rev ", "")
@@ -280,7 +342,35 @@ def test_check_013_part_revision_format_standard(db_session, base_hierarchy):
 
 
 def test_check_014_part_positive_weight_constraint(db_session, base_hierarchy):
-    """Check 014: Part weight in kilograms must be strictly greater than zero."""
+    """Check 014: Part weight in kilograms must be strictly greater than zero; non-positive rejected."""
+    prog_id = base_hierarchy["program"].id
+
+    # 1. Zero weight rejected
+    with pytest.raises(ValueError):
+        PartCreate(
+            program_id=prog_id,
+            part_number="PART-ZERO-WT",
+            name="Zero Weight Part",
+            subsystem="Front Door Closure",
+            category="Mechanical",
+            supplier="Supplier",
+            material="Steel",
+            weight_kg=0.0
+        )
+
+    # 2. Negative weight rejected
+    with pytest.raises(ValueError):
+        PartCreate(
+            program_id=prog_id,
+            part_number="PART-NEG-WT",
+            name="Negative Weight Part",
+            subsystem="Front Door Closure",
+            category="Mechanical",
+            supplier="Supplier",
+            material="Steel",
+            weight_kg=-2.5
+        )
+
     part = base_hierarchy["part"]
     assert part.weight_kg > 0.0
 
@@ -310,13 +400,35 @@ def test_check_016_part_safety_critical_flag_boolean(db_session, base_hierarchy)
 
 
 def test_check_017_part_material_specification_non_empty(db_session, base_hierarchy):
-    """Check 017: Material specification string must not be blank."""
+    """Check 017: Material specification string must not be blank; blank is rejected."""
+    with pytest.raises(ValueError):
+        PartCreate(
+            program_id=base_hierarchy["program"].id,
+            part_number="PART-BLANK-MAT",
+            name="Blank Mat Part",
+            subsystem="Primary Body Seal",
+            category="Elastomer",
+            supplier="Supplier",
+            material="   ",
+            weight_kg=1.0
+        )
     part = base_hierarchy["part"]
     assert len(part.material.strip()) > 0
 
 
 def test_check_018_part_supplier_attribution(db_session, base_hierarchy):
-    """Check 018: Part must have an identifiable Tier-1/Tier-2 supplier."""
+    """Check 018: Part must have an identifiable Tier-1/Tier-2 supplier; blank is rejected."""
+    with pytest.raises(ValueError):
+        PartCreate(
+            program_id=base_hierarchy["program"].id,
+            part_number="PART-BLANK-SUP",
+            name="Blank Sup Part",
+            subsystem="Primary Body Seal",
+            category="Elastomer",
+            supplier="   ",
+            material="EPDM",
+            weight_kg=1.0
+        )
     part = base_hierarchy["part"]
     assert len(part.supplier.strip()) > 0
 

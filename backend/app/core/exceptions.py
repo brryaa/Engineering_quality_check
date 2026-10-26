@@ -43,7 +43,7 @@ async def app_exception_handler(request: Request, exc: HTTPException):
     logger.warning(f"HTTPException [{exc.status_code}] on {request.method} {request.url.path}: {exc.detail}")
     return JSONResponse(
         status_code=exc.status_code,
-        content={"success": False, "error": exc.detail, "status_code": exc.status_code}
+        content={"success": False, "error": exc.detail, "detail": exc.detail, "status_code": exc.status_code}
     )
 
 

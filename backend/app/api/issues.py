@@ -2,7 +2,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.models.models import EngineeringIssue
+from app.core.auth import get_current_user, require_roles
+from app.models.models import EngineeringIssue, User
 from app.schemas.schemas import IssueCreate, IssueUpdate, IssueResponse, PaginatedResponse
 from app.services.services import IssueService
 
@@ -59,18 +60,31 @@ def get_issue(issue_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=IssueResponse, status_code=status.HTTP_201_CREATED)
-def create_issue(payload: IssueCreate, db: Session = Depends(get_db)):
+def create_issue(
+    payload: IssueCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     issue = IssueService(db).create_issue(payload)
     return _to_response(issue)
 
 
 @router.put("/{issue_id}", response_model=IssueResponse)
-def update_issue(issue_id: int, payload: IssueUpdate, db: Session = Depends(get_db)):
+def update_issue(
+    issue_id: int,
+    payload: IssueUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     issue = IssueService(db).update_issue(issue_id, payload)
     return _to_response(issue)
 
 
 @router.delete("/{issue_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_issue(issue_id: int, db: Session = Depends(get_db)):
+def delete_issue(
+    issue_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead"))
+):
     IssueService(db).delete_issue(issue_id)
     return None

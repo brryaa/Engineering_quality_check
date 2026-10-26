@@ -1,15 +1,35 @@
 import {
   Program, Part, DFMEA, DVPR, TestRun, EngineeringIssue,
   RootCauseAnalysis, EngineeringChange, QualityDashboardStats,
-  KnowledgeItem, PaginatedResponse
+  KnowledgeItem, PaginatedResponse, User, TokenResponse
 } from '../types';
 
 const BASE_URL = '/api/v1';
+const TOKEN_KEY = 'eql_access_token';
+const USER_KEY = 'eql_user_profile';
+
+export const authStorage = {
+  getToken: (): string | null => localStorage.getItem(TOKEN_KEY),
+  setToken: (token: string): void => localStorage.setItem(TOKEN_KEY, token),
+  clearToken: (): void => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  },
+  getUser: (): User | null => {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  },
+  setUser: (user: User): void => localStorage.setItem(USER_KEY, JSON.stringify(user)),
+};
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = authStorage.getToken();
+  const authHeader: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+
   const res = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
+      ...authHeader,
       ...options?.headers
     },
     ...options
@@ -146,4 +166,17 @@ export const api = {
     fetchJson<KnowledgeItem>(`${BASE_URL}/knowledge/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteKnowledgeItem: (id: number) =>
     fetchJson<void>(`${BASE_URL}/knowledge/${id}`, { method: 'DELETE' }),
+
+  // Authentication & RBAC
+  login: async (username: string, password: string): Promise<TokenResponse> => {
+    const res = await fetchJson<TokenResponse>(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    });
+    authStorage.setToken(res.access_token);
+    authStorage.setUser(res.user);
+    return res;
+  },
+  getCurrentUser: () => fetchJson<User>(`${BASE_URL}/auth/me`),
+  logout: () => authStorage.clearToken(),
 };

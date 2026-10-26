@@ -2,6 +2,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.auth import get_current_user, require_roles
+from app.models.models import User
 from app.schemas.schemas import DFMEACreate, DFMEAUpdate, DFMEAResponse, PaginatedResponse
 from app.services.services import DFMEAService
 
@@ -47,20 +49,33 @@ def get_dfmea(dfmea_id: int, db: Session = Depends(get_db)):
     return resp
 
 @router.post("", response_model=DFMEAResponse, status_code=status.HTTP_201_CREATED)
-def create_dfmea(payload: DFMEACreate, db: Session = Depends(get_db)):
+def create_dfmea(
+    payload: DFMEACreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     dfmea = DFMEAService(db).create_dfmea(payload)
     resp = DFMEAResponse.model_validate(dfmea)
     resp.part_number = dfmea.part.part_number if dfmea.part else None
     return resp
 
 @router.put("/{dfmea_id}", response_model=DFMEAResponse)
-def update_dfmea(dfmea_id: int, payload: DFMEAUpdate, db: Session = Depends(get_db)):
+def update_dfmea(
+    dfmea_id: int,
+    payload: DFMEAUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead", "design_engineer"))
+):
     dfmea = DFMEAService(db).update_dfmea(dfmea_id, payload)
     resp = DFMEAResponse.model_validate(dfmea)
     resp.part_number = dfmea.part.part_number if dfmea.part else None
     return resp
 
 @router.delete("/{dfmea_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_dfmea(dfmea_id: int, db: Session = Depends(get_db)):
+def delete_dfmea(
+    dfmea_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "quality_lead"))
+):
     DFMEAService(db).delete_dfmea(dfmea_id)
     return None
