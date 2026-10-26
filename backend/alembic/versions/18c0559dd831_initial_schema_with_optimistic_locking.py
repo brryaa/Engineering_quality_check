@@ -1,4 +1,4 @@
-"""Initial schema with full tables and optimistic locking
+"""Initial schema with full tables and optimistic locking matching models.py exactly
 
 Revision ID: 18c0559dd831
 Revises: 
@@ -68,26 +68,32 @@ def upgrade() -> None:
             "dfmeas",
             sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
             sa.Column("part_id", sa.Integer(), sa.ForeignKey("parts.id", ondelete="CASCADE"), nullable=False),
-            sa.Column("item_function", sa.String(256), nullable=False),
-            sa.Column("failure_mode", sa.String(256), nullable=False),
+            sa.Column("fmea_code", sa.String(64), nullable=False, unique=True),
+            sa.Column("item_function", sa.Text(), nullable=False),
+            sa.Column("failure_mode", sa.Text(), nullable=False),
             sa.Column("failure_effect", sa.Text(), nullable=False),
             sa.Column("severity", sa.Integer(), nullable=False),
-            sa.Column("potential_cause", sa.Text(), nullable=False),
+            sa.Column("cause_mechanism", sa.Text(), nullable=False),
             sa.Column("occurrence", sa.Integer(), nullable=False),
             sa.Column("prevention_control", sa.Text(), nullable=False),
             sa.Column("detection_control", sa.Text(), nullable=False),
             sa.Column("detection", sa.Integer(), nullable=False),
             sa.Column("rpn", sa.Integer(), nullable=False),
-            sa.Column("action_priority", sa.String(8), nullable=False),
+            sa.Column("action_priority", sa.String(16), nullable=False, server_default="Low"),
             sa.Column("recommended_action", sa.Text(), nullable=True),
-            sa.Column("responsible", sa.String(64), nullable=True),
+            sa.Column("action_owner", sa.String(64), nullable=True),
             sa.Column("target_date", sa.String(10), nullable=True),
             sa.Column("action_status", sa.String(32), nullable=False, server_default="Open"),
+            sa.Column("post_severity", sa.Integer(), nullable=True),
+            sa.Column("post_occurrence", sa.Integer(), nullable=True),
+            sa.Column("post_detection", sa.Integer(), nullable=True),
+            sa.Column("post_rpn", sa.Integer(), nullable=True),
             sa.Column("created_at", sa.DateTime(), nullable=True),
             sa.Column("updated_at", sa.DateTime(), nullable=True),
         )
+        op.create_index("ix_dfmeas_fmea_code", "dfmeas", ["fmea_code"])
         op.create_index("ix_dfmeas_part_id", "dfmeas", ["part_id"])
-        op.create_index("ix_dfmeas_action_priority", "dfmeas", ["action_priority"])
+        op.create_index("ix_dfmeas_part_rpn", "dfmeas", ["part_id", "rpn"])
 
     # 4. Table: dvprs
     if "dvprs" not in existing_tables:
@@ -96,14 +102,15 @@ def upgrade() -> None:
             sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
             sa.Column("program_id", sa.Integer(), sa.ForeignKey("programs.id", ondelete="CASCADE"), nullable=False),
             sa.Column("part_id", sa.Integer(), sa.ForeignKey("parts.id", ondelete="CASCADE"), nullable=False),
-            sa.Column("dfmea_id", sa.Integer(), sa.ForeignKey("dfmeas.id", ondelete="SET NULL"), nullable=True),
             sa.Column("plan_code", sa.String(64), nullable=False, unique=True),
             sa.Column("test_phase", sa.String(32), nullable=False),
-            sa.Column("test_name", sa.String(256), nullable=False),
-            sa.Column("standard_ref", sa.String(128), nullable=False),
+            sa.Column("test_name", sa.String(128), nullable=False),
+            sa.Column("test_standard", sa.String(128), nullable=False),
             sa.Column("acceptance_criteria", sa.Text(), nullable=False),
             sa.Column("sample_size", sa.Integer(), nullable=False, server_default="3"),
-            sa.Column("target_completion_date", sa.String(10), nullable=True),
+            sa.Column("test_facility", sa.String(128), nullable=False),
+            sa.Column("planned_start_date", sa.String(10), nullable=False),
+            sa.Column("planned_end_date", sa.String(10), nullable=False),
             sa.Column("status", sa.String(32), nullable=False, server_default="Planned"),
             sa.Column("responsible_engineer", sa.String(64), nullable=False),
             sa.Column("created_at", sa.DateTime(), nullable=True),
@@ -112,6 +119,7 @@ def upgrade() -> None:
         op.create_index("ix_dvprs_plan_code", "dvprs", ["plan_code"])
         op.create_index("ix_dvprs_program_id", "dvprs", ["program_id"])
         op.create_index("ix_dvprs_part_id", "dvprs", ["part_id"])
+        op.create_index("ix_dvpr_prog_status", "dvprs", ["program_id", "status"])
 
     # 5. Table: test_runs
     if "test_runs" not in existing_tables:
@@ -120,22 +128,23 @@ def upgrade() -> None:
             sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
             sa.Column("dvpr_id", sa.Integer(), sa.ForeignKey("dvprs.id", ondelete="CASCADE"), nullable=False),
             sa.Column("run_number", sa.String(64), nullable=False, unique=True),
-            sa.Column("sample_identifier", sa.String(64), nullable=False),
-            sa.Column("test_bench", sa.String(128), nullable=False),
-            sa.Column("chamber_temp_c", sa.Float(), nullable=False),
-            sa.Column("chamber_humidity_rh", sa.Float(), nullable=False),
-            sa.Column("cycles_completed", sa.Integer(), nullable=False),
-            sa.Column("target_cycles", sa.Integer(), nullable=False),
-            sa.Column("result", sa.String(16), nullable=False),
-            sa.Column("failure_description", sa.Text(), nullable=True),
-            sa.Column("telemetry_data", sa.Text(), nullable=True),
-            sa.Column("executed_at", sa.DateTime(), nullable=True),
+            sa.Column("sample_id", sa.String(64), nullable=False),
+            sa.Column("test_date", sa.String(10), nullable=False),
+            sa.Column("test_facility", sa.String(128), nullable=False),
             sa.Column("operator", sa.String(64), nullable=False),
+            sa.Column("temperature_c", sa.Float(), nullable=False, server_default="23.0"),
+            sa.Column("humidity_rh", sa.Float(), nullable=False, server_default="50.0"),
+            sa.Column("cycles_completed", sa.Integer(), nullable=False, server_default="0"),
+            sa.Column("measurement_data", sa.Text(), nullable=False, server_default="{}"),
+            sa.Column("result", sa.String(32), nullable=False),
+            sa.Column("failure_summary", sa.Text(), nullable=True),
+            sa.Column("report_file_url", sa.String(256), nullable=True),
             sa.Column("created_at", sa.DateTime(), nullable=True),
             sa.Column("updated_at", sa.DateTime(), nullable=True),
         )
         op.create_index("ix_test_runs_run_number", "test_runs", ["run_number"])
         op.create_index("ix_test_runs_dvpr_id", "test_runs", ["dvpr_id"])
+        op.create_index("ix_testrun_dvpr_res", "test_runs", ["dvpr_id", "result"])
 
     # 6. Table: issues
     if "issues" not in existing_tables:
@@ -143,17 +152,19 @@ def upgrade() -> None:
             "issues",
             sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
             sa.Column("issue_code", sa.String(64), nullable=False, unique=True),
-            sa.Column("program_id", sa.Integer(), sa.ForeignKey("programs.id", ondelete="CASCADE"), nullable=False),
-            sa.Column("part_id", sa.Integer(), sa.ForeignKey("parts.id", ondelete="CASCADE"), nullable=False),
-            sa.Column("test_run_id", sa.Integer(), sa.ForeignKey("test_runs.id", ondelete="SET NULL"), nullable=True),
+            sa.Column("program_id", sa.Integer(), sa.ForeignKey("programs.id"), nullable=False),
+            sa.Column("part_id", sa.Integer(), sa.ForeignKey("parts.id"), nullable=False),
+            sa.Column("test_run_id", sa.Integer(), sa.ForeignKey("test_runs.id"), nullable=True),
             sa.Column("title", sa.String(256), nullable=False),
-            sa.Column("description", sa.Text(), nullable=False),
             sa.Column("severity", sa.String(16), nullable=False),
             sa.Column("status", sa.String(32), nullable=False, server_default="New"),
+            sa.Column("description", sa.Text(), nullable=False),
+            sa.Column("occurrence_phase", sa.String(32), nullable=False),
             sa.Column("containment_action", sa.Text(), nullable=True),
             sa.Column("assignee", sa.String(64), nullable=False),
-            sa.Column("target_close_date", sa.String(10), nullable=True),
-            sa.Column("closed_at", sa.DateTime(), nullable=True),
+            sa.Column("reporter", sa.String(64), nullable=False),
+            sa.Column("due_date", sa.String(10), nullable=False),
+            sa.Column("closure_date", sa.String(10), nullable=True),
             sa.Column("version_id", sa.Integer(), nullable=False, server_default="1"),
             sa.Column("created_at", sa.DateTime(), nullable=True),
             sa.Column("updated_at", sa.DateTime(), nullable=True),
@@ -161,6 +172,8 @@ def upgrade() -> None:
         op.create_index("ix_issues_issue_code", "issues", ["issue_code"])
         op.create_index("ix_issues_program_id", "issues", ["program_id"])
         op.create_index("ix_issues_part_id", "issues", ["part_id"])
+        op.create_index("ix_issues_test_run_id", "issues", ["test_run_id"])
+        op.create_index("ix_issue_prog_sev_stat", "issues", ["program_id", "severity", "status"])
     else:
         columns = {c["name"] for c in inspector.get_columns("issues")}
         if "version_id" not in columns:
@@ -173,15 +186,24 @@ def upgrade() -> None:
             "root_causes",
             sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
             sa.Column("issue_id", sa.Integer(), sa.ForeignKey("issues.id", ondelete="CASCADE"), nullable=False, unique=True),
-            sa.Column("methodology", sa.String(32), nullable=False, server_default="5-Why"),
-            sa.Column("why_1", sa.Text(), nullable=False),
+            sa.Column("analysis_method", sa.String(32), nullable=False, server_default="5-Why"),
+            sa.Column("direct_cause", sa.Text(), nullable=False),
+            sa.Column("why_1", sa.Text(), nullable=True),
             sa.Column("why_2", sa.Text(), nullable=True),
             sa.Column("why_3", sa.Text(), nullable=True),
             sa.Column("why_4", sa.Text(), nullable=True),
             sa.Column("why_5", sa.Text(), nullable=True),
-            sa.Column("ishikawa_factors", sa.Text(), nullable=True),
-            sa.Column("root_cause_summary", sa.Text(), nullable=False),
-            sa.Column("is_confirmed", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+            sa.Column("systemic_root_cause", sa.Text(), nullable=False),
+            sa.Column("fishbone_man", sa.Text(), nullable=True),
+            sa.Column("fishbone_machine", sa.Text(), nullable=True),
+            sa.Column("fishbone_material", sa.Text(), nullable=True),
+            sa.Column("fishbone_method", sa.Text(), nullable=True),
+            sa.Column("fishbone_measurement", sa.Text(), nullable=True),
+            sa.Column("fishbone_environment", sa.Text(), nullable=True),
+            sa.Column("verification_method", sa.Text(), nullable=False),
+            sa.Column("verification_result", sa.String(32), nullable=False, server_default="Pending"),
+            sa.Column("analyst", sa.String(64), nullable=False),
+            sa.Column("analyzed_at", sa.String(10), nullable=False),
             sa.Column("created_at", sa.DateTime(), nullable=True),
             sa.Column("updated_at", sa.DateTime(), nullable=True),
         )
@@ -193,9 +215,9 @@ def upgrade() -> None:
             "changes",
             sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
             sa.Column("change_code", sa.String(64), nullable=False, unique=True),
-            sa.Column("program_id", sa.Integer(), sa.ForeignKey("programs.id", ondelete="CASCADE"), nullable=False),
-            sa.Column("part_id", sa.Integer(), sa.ForeignKey("parts.id", ondelete="CASCADE"), nullable=False),
-            sa.Column("issue_id", sa.Integer(), sa.ForeignKey("issues.id", ondelete="SET NULL"), nullable=True),
+            sa.Column("program_id", sa.Integer(), sa.ForeignKey("programs.id"), nullable=False),
+            sa.Column("part_id", sa.Integer(), sa.ForeignKey("parts.id"), nullable=False),
+            sa.Column("issue_id", sa.Integer(), sa.ForeignKey("issues.id"), nullable=True),
             sa.Column("title", sa.String(256), nullable=False),
             sa.Column("change_type", sa.String(32), nullable=False),
             sa.Column("reason", sa.Text(), nullable=False),
@@ -203,7 +225,7 @@ def upgrade() -> None:
             sa.Column("post_change_rev", sa.String(16), nullable=False),
             sa.Column("cost_impact_rmb", sa.Float(), nullable=False, server_default="0.0"),
             sa.Column("weight_impact_kg", sa.Float(), nullable=False, server_default="0.0"),
-            sa.Column("tooling_lead_weeks", sa.Integer(), nullable=False, server_default="0"),
+            sa.Column("tooling_lead_weeks", sa.Integer(), nullable=False, server_default="4"),
             sa.Column("requires_homologation", sa.Boolean(), nullable=False, server_default=sa.text("0")),
             sa.Column("requires_dvp_retest", sa.Boolean(), nullable=False, server_default=sa.text("1")),
             sa.Column("approval_status", sa.String(32), nullable=False, server_default="Draft"),
@@ -218,6 +240,8 @@ def upgrade() -> None:
         op.create_index("ix_changes_change_code", "changes", ["change_code"])
         op.create_index("ix_changes_program_id", "changes", ["program_id"])
         op.create_index("ix_changes_part_id", "changes", ["part_id"])
+        op.create_index("ix_changes_issue_id", "changes", ["issue_id"])
+        op.create_index("ix_change_prog_status", "changes", ["program_id", "approval_status"])
     else:
         columns = {c["name"] for c in inspector.get_columns("changes")}
         if "version_id" not in columns:
@@ -229,17 +253,21 @@ def upgrade() -> None:
         op.create_table(
             "knowledge_items",
             sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
+            sa.Column("doc_code", sa.String(64), nullable=False, unique=True),
             sa.Column("title", sa.String(256), nullable=False),
-            sa.Column("category", sa.String(64), nullable=False),
             sa.Column("subsystem", sa.String(64), nullable=False),
-            sa.Column("summary", sa.Text(), nullable=False),
+            sa.Column("category", sa.String(32), nullable=False),
+            sa.Column("tags", sa.String(256), nullable=False),
             sa.Column("content", sa.Text(), nullable=False),
-            sa.Column("standard_code", sa.String(64), nullable=True),
-            sa.Column("tags", sa.String(256), nullable=True),
+            sa.Column("keywords", sa.Text(), nullable=False),
+            sa.Column("source_reference", sa.String(128), nullable=True),
+            sa.Column("applicable_programs", sa.String(128), nullable=True),
             sa.Column("author", sa.String(64), nullable=False),
             sa.Column("created_at", sa.DateTime(), nullable=True),
             sa.Column("updated_at", sa.DateTime(), nullable=True),
         )
+        op.create_index("ix_knowledge_items_doc_code", "knowledge_items", ["doc_code"])
+        op.create_index("ix_knowledge_items_title", "knowledge_items", ["title"])
         op.create_index("ix_knowledge_items_category", "knowledge_items", ["category"])
         op.create_index("ix_knowledge_items_subsystem", "knowledge_items", ["subsystem"])
 
@@ -252,7 +280,7 @@ def upgrade() -> None:
             sa.Column("email", sa.String(128), nullable=False, unique=True),
             sa.Column("hashed_password", sa.String(256), nullable=False),
             sa.Column("full_name", sa.String(128), nullable=False),
-            sa.Column("role", sa.String(32), nullable=False, server_default="design_eng"),
+            sa.Column("role", sa.String(32), nullable=False, server_default="viewer"),
             sa.Column("department", sa.String(64), nullable=False, server_default="Engineering Quality"),
             sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
             sa.Column("created_at", sa.DateTime(), nullable=True),
@@ -260,6 +288,7 @@ def upgrade() -> None:
         )
         op.create_index("ix_users_username", "users", ["username"])
         op.create_index("ix_users_email", "users", ["email"])
+        op.create_index("ix_users_role", "users", ["role"])
 
 
 def downgrade() -> None:

@@ -12,9 +12,9 @@ class Settings(BaseModel):
     # SQLite configuration with WAL mode (defaults to backend directory)
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
 
-    # Security & Rate Limiting
+    # Security & Rate Limiting (High default allows extensive automated test suites and high-cadence UI interactions)
     RATE_LIMIT_ENABLED: bool = os.getenv("RATE_LIMIT_ENABLED", "true").lower() in ("true", "1", "yes")
-    RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "300"))
+    RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "10000"))
     RATE_LIMIT_WINDOW_SECONDS: int = 60
     MAX_BODY_SIZE_BYTES: int = 5 * 1024 * 1024  # 5 MB
 

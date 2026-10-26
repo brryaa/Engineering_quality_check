@@ -118,11 +118,19 @@ def get_current_user(
 
 
 def require_roles(*allowed_roles: str) -> Callable:
-    """Enforce RBAC role check. Admin always has full access."""
+    """Enforce RBAC role check. Admin always has full access. Supports role aliases (e.g. design_eng / design_engineer)."""
+    normalized_allowed = set()
+    for r in allowed_roles:
+        normalized_allowed.add(r)
+        if r in ("design_eng", "design_engineer"):
+            normalized_allowed.update(["design_eng", "design_engineer"])
+        if r in ("auditor", "viewer"):
+            normalized_allowed.update(["auditor", "viewer"])
+
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role == "admin":
             return current_user
-        if current_user.role not in allowed_roles:
+        if current_user.role not in normalized_allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Operation forbidden. Required roles: {list(allowed_roles)}. Your role is '{current_user.role}'."

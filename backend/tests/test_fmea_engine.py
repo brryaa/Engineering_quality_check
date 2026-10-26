@@ -45,15 +45,20 @@ def test_action_priority_aiag_vda_standards():
 
 def test_action_priority_full_1000_ground_truth_exhaustive():
     """Verify all 1,000 combinations against independent Table B to kill all mutants."""
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    standard_file = os.path.join(base_dir, "docs", "standards", "AIAG_VDA_2019_DFMEA_TABLE_B.json")
-    if os.path.exists(standard_file):
-        with open(standard_file, "r", encoding="utf-8") as f:
-            lookup = json.load(f)["lookup_cells"]
-        for s in range(1, 11):
-            for o in range(1, 11):
-                for d in range(1, 11):
-                    assert calculate_action_priority(s, o, d) == lookup[f"{s},{o},{d}"]
+    candidates = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "app", "services", "AIAG_VDA_2019_DFMEA_TABLE_B.json")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "docs", "standards", "AIAG_VDA_2019_DFMEA_TABLE_B.json")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "docs", "standards", "AIAG_VDA_2019_DFMEA_TABLE_B.json")),
+    ]
+    standard_file = next((p for p in candidates if os.path.exists(p)), None)
+    assert standard_file is not None, "Independent Table B standard ground truth file must exist."
+
+    with open(standard_file, "r", encoding="utf-8") as f:
+        lookup = json.load(f)["lookup_cells"]
+    for s in range(1, 11):
+        for o in range(1, 11):
+            for d in range(1, 11):
+                assert calculate_action_priority(s, o, d) == lookup[f"{s},{o},{d}"]
 
     # Error handling & type strictness
     with pytest.raises(TypeError):

@@ -18,7 +18,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'cd ../backend && PYTHONPATH=. python3 -m uvicorn app.main:app --port 8088',
+      command: 'cd ../backend && RATE_LIMIT_REQUESTS=20000 PYTHONPATH=. python3 -m uvicorn app.main:app --port 8088',
       port: 8088,
       reuseExistingServer: true,
       timeout: 10000

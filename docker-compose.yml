@@ -11,6 +11,7 @@ services:
       - eql_data:/app/data
     environment:
       - DATABASE_URL=sqlite:////app/data/eql_platform.db
+      - RATE_LIMIT_REQUESTS=20000
     restart: unless-stopped
 
   frontend:

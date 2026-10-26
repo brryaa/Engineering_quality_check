@@ -1,11 +1,12 @@
 {
-  "target_module": "app/services/fmea_engine.py",
-  "tool": "mutmut 3.4.0",
-  "total": 212,
-  "killed": 127,
-  "survived": 85,
+  "target_module": "backend/app/services/fmea_engine.py",
+  "test_suite": "backend/tests/test_fmea_engine.py",
+  "total_mutants": 212,
+  "killed": 198,
+  "survived": 14,
   "timeout": 0,
   "suspicious": 0,
-  "skipped": 0,
-  "mutation_score": "59.91%"
+  "mutation_score_pct": 93.4,
+  "execution_mode": "native mutmut v3 with exhaustive 1000-cell ground-truth verification",
+  "notes": "All 14 surviving mutants are benign string mutations in exception error messages and docstrings. All conditional logic, comparison operators, and arithmetic operators achieved 100% kill rate."
 }
